@@ -516,7 +516,7 @@ const GOOGLE_CLIENT_ID = '785743667835-upe7u9j5nf40i4e3uth9pj88kh0pq7f2.apps.goo
 (function() {
   try {
     const u = JSON.parse(localStorage.getItem('mp_user') || 'null');
-    if (u && u.email) window.location.replace('index.html');
+    if (u && u.email) window.location.replace('https://marketpulse-devansh.netlify.app/index.html');
   } catch(e) {}
 })();
 
@@ -678,7 +678,7 @@ function handleCredentialResponse(response) {
     document.getElementById('lcUserName').textContent  = user.name;
     document.getElementById('lcUserEmail').textContent = user.email;
 
-    setTimeout(() => window.location.replace('index.html'), 1100);
+    setTimeout(() => window.location.replace('https://marketpulse-devansh.netlify.app/index.html'), 1100);
   } catch (e) {
     showError('Sign-in failed — could not read account info. Please try again.');
   }
