@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MarketPulse — Sign In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    :root {
+      --bg:      #070b11;
+      --bg2:     #0d1421;
+      --card:    rgba(13,20,33,0.92);
+      --border:  rgba(88,166,255,0.14);
+      --border2: rgba(255,255,255,0.06);
+      --text1:   #e8edf5;
+      --text2:   #8892a4;
+      --text3:   #4a5568;
+      --green:   #3fb950;
+      --red:     #f85149;
+      --us:      #58a6ff;
+      --india:   #ff7b4f;
+      --purple:  #a78bfa;
+      --yellow:  #d2a520;
+    }
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    html, body { height:100%; }
+    body {
+      background: var(--bg);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: var(--text1);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Background canvas ── */
+    #bgCanvas {
+      position: fixed; inset: 0; z-index: 0;
+    }
+
+    /* ── Radial glow ── */
+    .bg-glow {
+      position: fixed;
+      top: 40%; left: 30%;
+      transform: translate(-50%,-50%);
+      width: 800px; height: 800px;
+      background: radial-gradient(circle, rgba(88,166,255,0.06) 0%, transparent 65%);
+      pointer-events: none; z-index: 1;
+    }
+    .bg-glow-right {
+      position: fixed;
+      top: 60%; left: 75%;
+      transform: translate(-50%,-50%);
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(255,123,79,0.05) 0%, transparent 65%);
+      pointer-events: none; z-index: 1;
+    }
+
+    /* ── Floating ticker pills ── */
+    .float-pills {
+      position: fixed; inset: 0; z-index: 2;
+      pointer-events: none; overflow: hidden;
+    }
+    .fpill {
+      position: absolute;
+      background: rgba(13,20,33,0.75);
+      border: 1px solid var(--border2);
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      display: flex; align-items: center; gap: 6px;
+      backdrop-filter: blur(8px);
+      animation: floatUp linear infinite;
+      white-space: nowrap;
+    }
+    .fpill .fsym { color: var(--text2); font-weight: 600; }
+    .fpill .fchg.up  { color: var(--green); }
+    .fpill .fchg.dn  { color: var(--red); }
+    @keyframes floatUp {
+      0%   { transform: translateY(100vh); opacity: 0; }
+      8%   { opacity: 1; }
+      92%  { opacity: 1; }
+      100% { transform: translateY(-120px); opacity: 0; }
+    }
+
+    /* ── Main layout ── */
+    .login-wrap {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      overflow-y: auto;
+    }
+
+    /* ── Left: Branding panel ── */
+    .brand-panel {
+      display: flex; flex-direction: column;
+      justify-content: center;
+      padding: 60px 72px;
+    }
+
+    .brand-logo {
+      display: flex; align-items: center; gap: 14px;
+      margin-bottom: 56px;
+    }
+    .brand-logo-mark {
+      width: 50px; height: 50px;
+      background: linear-gradient(135deg, #58a6ff, #3a6fd4);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 8px 32px rgba(88,166,255,0.28);
+      flex-shrink: 0;
+    }
+    .brand-logo-text .bname {
+      display: block; font-size: 20px; font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .brand-logo-text .btag {
+      display: block; font-size: 11px; color: var(--text3);
+      letter-spacing: 0.6px; text-transform: uppercase;
+    }
+
+    .brand-headline {
+      font-size: 50px; font-weight: 800;
+      line-height: 1.08; letter-spacing: -1.5px;
+      margin-bottom: 20px;
+    }
+    .brand-headline .acc {
+      background: linear-gradient(135deg, var(--us) 0%, var(--purple) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .brand-sub {
+      font-size: 16px; color: var(--text2);
+      line-height: 1.65; max-width: 460px;
+      margin-bottom: 44px;
+    }
+
+    .brand-features {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 12px; max-width: 500px;
+    }
+    .bf-item {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 14px 16px;
+      background: rgba(255,255,255,0.025);
+      border: 1px solid var(--border2);
+      border-radius: 12px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .bf-item:hover {
+      border-color: rgba(88,166,255,0.18);
+      background: rgba(88,166,255,0.04);
+    }
+    .bf-icon {
+      width: 34px; height: 34px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; flex-shrink: 0;
+    }
+    .bf-icon.c-us     { background: rgba(88,166,255,0.12);  color: var(--us); }
+    .bf-icon.c-india  { background: rgba(255,123,79,0.12);  color: var(--india); }
+    .bf-icon.c-green  { background: rgba(63,185,80,0.12);   color: var(--green); }
+    .bf-icon.c-purple { background: rgba(167,139,250,0.12); color: var(--purple); }
+    .bf-icon.c-yellow { background: rgba(210,165,32,0.12);  color: var(--yellow); }
+    .bf-icon.c-teal   { background: rgba(45,212,191,0.12);  color: #2dd4bf; }
+    .bf-text strong { display: block; font-size: 12px; font-weight: 600; margin-bottom: 1px; }
+    .bf-text span   { font-size: 11px; color: var(--text3); }
+
+    .brand-status {
+      margin-top: 36px;
+      display: flex; align-items: center; gap: 16px;
+      flex-wrap: wrap;
+    }
+    .st-pill {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 12px;
+      border: 1px solid var(--border2);
+      border-radius: 20px;
+      font-size: 11px; color: var(--text2);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .st-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+    }
+    .st-dot.green { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+    .st-dot.gray  { background: var(--text3); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+
+    /* ── Right: Login panel ── */
+    .login-panel {
+      display: flex; flex-direction: column;
+      justify-content: center;
+      padding: 40px 32px;
+      background: rgba(8,12,20,0.65);
+      border-left: 1px solid var(--border2);
+      backdrop-filter: blur(40px);
+      -webkit-backdrop-filter: blur(40px);
+    }
+
+    .login-card {
+      background: rgba(16,24,38,0.95);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 36px 32px 28px;
+      box-shadow:
+        0 32px 80px rgba(0,0,0,0.55),
+        0 0 0 1px rgba(88,166,255,0.04) inset;
+    }
+
+    /* Card top logo */
+    .lc-logo {
+      display: flex; align-items: center; justify-content: center;
+      gap: 10px; margin-bottom: 6px;
+    }
+    .lc-logo-mark {
+      width: 38px; height: 38px;
+      background: linear-gradient(135deg, #58a6ff, #3a6fd4);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 6px 20px rgba(88,166,255,0.25);
+    }
+    .lc-logo-name { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+
+    .lc-title {
+      font-size: 22px; font-weight: 700;
+      text-align: center; letter-spacing: -0.4px;
+      margin-bottom: 6px;
+    }
+    .lc-sub {
+      font-size: 12px; color: var(--text2);
+      text-align: center; line-height: 1.6;
+      margin-bottom: 28px;
+    }
+
+    /* Error */
+    .lc-error {
+      display: none;
+      background: rgba(248,81,73,0.09);
+      border: 1px solid rgba(248,81,73,0.22);
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-size: 12px; color: var(--red);
+      text-align: center; margin-bottom: 14px;
+    }
+    .lc-error.show { display: block; }
+
+    /* User loading state */
+    .lc-user-loading {
+      display: none; flex-direction: column; align-items: center; gap: 10px;
+      padding: 20px 0;
+    }
+    .lc-user-loading.show { display: flex; }
+    .lc-user-avatar {
+      width: 60px; height: 60px; border-radius: 50%;
+      border: 2px solid var(--us); object-fit: cover;
+      background: var(--bg2);
+    }
+    .lc-user-avatar.placeholder {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; color: var(--text2);
+    }
+    .lc-user-name  { font-size: 15px; font-weight: 600; }
+    .lc-user-email { font-size: 11px; color: var(--text2); }
+    .lc-redirect   { font-size: 11px; color: var(--text3); }
+
+    /* Google sign-in button area */
+    #googleBtnContainer {
+      display: flex; justify-content: center;
+      min-height: 44px; margin-bottom: 14px;
+    }
+
+    /* Fallback custom Google button */
+    .google-btn-custom {
+      width: 100%; max-width: 320px;
+      padding: 12px 20px;
+      background: #fff;
+      border: none; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 14px; font-weight: 600;
+      color: #1f2937; cursor: pointer;
+      transition: opacity 0.18s, transform 0.18s;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+    }
+    .google-btn-custom:hover  { opacity: 0.92; transform: translateY(-1px); }
+    .google-btn-custom:active { transform: translateY(0); }
+
+    /* Setup required notice */
+    .setup-notice {
+      background: rgba(88,166,255,0.07);
+      border: 1px solid rgba(88,166,255,0.18);
+      border-radius: 10px;
+      padding: 16px; text-align: center;
+      font-size: 12px; color: var(--text2); line-height: 1.7;
+    }
+    .setup-notice strong  { color: var(--text1); font-size: 13px; }
+    .setup-notice code    { color: var(--us); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+    .setup-notice a       { color: var(--us); text-decoration: none; }
+    .setup-notice a:hover { text-decoration: underline; }
+    .setup-notice i       { font-size: 20px; color: var(--us); margin-bottom: 8px; display: block; }
+
+    /* Feature mini list */
+    .lc-features {
+      display: flex; flex-direction: column; gap: 8px;
+      margin: 20px 0;
+      padding: 16px;
+      background: rgba(88,166,255,0.04);
+      border: 1px solid rgba(88,166,255,0.08);
+      border-radius: 10px;
+    }
+    .lc-feat {
+      display: flex; align-items: center; gap: 9px;
+      font-size: 12px; color: var(--text2);
+    }
+    .lc-feat i { width: 14px; font-size: 10px; color: var(--green); flex-shrink: 0; }
+
+    /* Note */
+    .lc-note {
+      font-size: 11px; color: var(--text3);
+      text-align: center; line-height: 1.6;
+      margin-top: 4px;
+    }
+
+    /* Clocks at card bottom */
+    .lc-clocks {
+      display: flex; justify-content: center; gap: 24px;
+      margin-top: 20px; padding-top: 16px;
+      border-top: 1px solid var(--border2);
+    }
+    .lc-clock {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; color: var(--text3);
+    }
+    .lc-clock .flag  { font-size: 13px; }
+    .lc-clock .ctime {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text2); font-size: 11px;
+    }
+
+    /* Spin */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { display: inline-block; animation: spin 0.75s linear infinite; }
+
+    /* ── Mobile ── */
+    @media (max-width: 860px) {
+      .login-wrap { grid-template-columns: 1fr; }
+      .brand-panel { display: none; }
+      .login-panel { border-left: none; padding: 24px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="bgCanvas"></canvas>
+<div class="bg-glow"></div>
+<div class="bg-glow-right"></div>
+<div class="float-pills" id="floatPills"></div>
+
+<div class="login-wrap">
+
+  <!-- ════ LEFT: Branding ════ -->
+  <div class="brand-panel">
+    <div class="brand-logo">
+      <div class="brand-logo-mark">
+        <svg width="26" height="22" viewBox="0 0 20 18" fill="none">
+          <polyline points="1,16 6,9 10,12 19,2" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="19" cy="2" r="2.2" fill="white"/>
+        </svg>
+      </div>
+      <div class="brand-logo-text">
+        <span class="bname">MarketPulse</span>
+        <span class="btag">Professional Terminal</span>
+      </div>
+    </div>
+
+    <h1 class="brand-headline">
+      Your Personal<br>
+      <span class="acc">Market Intelligence</span><br>
+      Platform
+    </h1>
+    <p class="brand-sub">
+      Track US & Indian markets in real-time, manage your portfolio across NYSE, NASDAQ, NSE & BSE, screen stocks with AI scoring, and get institutional flow insights — all in one terminal.
+    </p>
+
+    <div class="brand-features">
+      <div class="bf-item">
+        <div class="bf-icon c-us"><i class="fa-solid fa-chart-candlestick"></i></div>
+        <div class="bf-text">
+          <strong>US Markets</strong>
+          <span>NYSE · NASDAQ · Real-time</span>
+        </div>
+      </div>
+      <div class="bf-item">
+        <div class="bf-icon c-india"><i class="fa-solid fa-chart-line"></i></div>
+        <div class="bf-text">
+          <strong>India Markets</strong>
+          <span>NSE · BSE · F&amp;O data</span>
+        </div>
+      </div>
+      <div class="bf-item">
+        <div class="bf-icon c-green"><i class="fa-solid fa-briefcase"></i></div>
+        <div class="bf-text">
+          <strong>Portfolio Tracker</strong>
+          <span>P&amp;L · Allocation · X-Ray</span>
+        </div>
+      </div>
+      <div class="bf-item">
+        <div class="bf-icon c-purple"><i class="fa-solid fa-sliders"></i></div>
+        <div class="bf-text">
+          <strong>Stock Screener</strong>
+          <span>Filter · Score · Discover</span>
+        </div>
+      </div>
+      <div class="bf-item">
+        <div class="bf-icon c-yellow"><i class="fa-solid fa-building-columns"></i></div>
+        <div class="bf-text">
+          <strong>Smart Money</strong>
+          <span>Block · Bulk · Dark Pool</span>
+        </div>
+      </div>
+      <div class="bf-item">
+        <div class="bf-icon c-teal"><i class="fa-solid fa-robot"></i></div>
+        <div class="bf-text">
+          <strong>AI Assistant</strong>
+          <span>Gemini-powered analysis</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="brand-status">
+      <div class="st-pill"><span class="st-dot green"></span> 🇺🇸 NYSE · NASDAQ</div>
+      <div class="st-pill"><span class="st-dot green"></span> 🇮🇳 NSE · BSE</div>
+      <div class="st-pill"><span class="st-dot green"></span> <span id="brandNYTime">--:--</span> NY</div>
+      <div class="st-pill"><span class="st-dot green"></span> <span id="brandISTTime">--:--</span> IST</div>
+    </div>
+  </div>
+
+  <!-- ════ RIGHT: Login card ════ -->
+  <div class="login-panel">
+    <div class="login-card">
+
+      <div class="lc-logo">
+        <div class="lc-logo-mark">
+          <svg width="20" height="18" viewBox="0 0 20 18" fill="none">
+            <polyline points="1,16 6,9 10,12 19,2" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="19" cy="2" r="2.2" fill="white"/>
+          </svg>
+        </div>
+        <span class="lc-logo-name">MarketPulse</span>
+      </div>
+
+      <h2 class="lc-title">Welcome back</h2>
+      <p class="lc-sub">Sign in to access your personal trading terminal — portfolio, watchlists, screener &amp; more</p>
+
+      <div class="lc-error" id="lcError"></div>
+
+      <!-- User loading (shown after successful sign-in) -->
+      <div class="lc-user-loading" id="lcUserLoading">
+        <img id="lcUserAvatar" class="lc-user-avatar" src="" alt="" onerror="this.style.display='none'">
+        <div class="lc-user-name"  id="lcUserName"></div>
+        <div class="lc-user-email" id="lcUserEmail"></div>
+        <div class="lc-redirect"><i class="fa-solid fa-circle-notch spin"></i> Entering terminal…</div>
+      </div>
+
+      <!-- Sign-in section -->
+      <div id="signInSection">
+        <!-- Google renders their button here -->
+        <div id="googleBtnContainer"></div>
+
+        <!-- Fallback / setup notice rendered here by JS -->
+        <div id="googleFallback"></div>
+
+        <div class="lc-features">
+          <div class="lc-feat"><i class="fa-solid fa-check"></i> Your portfolio &amp; watchlists saved to your account</div>
+          <div class="lc-feat"><i class="fa-solid fa-check"></i> Access from any device, any time</div>
+          <div class="lc-feat"><i class="fa-solid fa-lock"></i> Secure — we only use your Google identity</div>
+        </div>
+
+        <p class="lc-note">By signing in you agree to our terms. Data is stored locally in your browser.</p>
+      </div>
+
+      <div class="lc-clocks">
+        <div class="lc-clock">
+          <span class="flag">🇺🇸</span>
+          <span>New York</span>
+          <span class="ctime" id="lcNYTime">--:--:--</span>
+        </div>
+        <div class="lc-clock">
+          <span class="flag">🇮🇳</span>
+          <span>Mumbai</span>
+          <span class="ctime" id="lcISTTime">--:--:--</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ================================================================
+// CONFIG — Set your Google OAuth 2.0 Client ID here.
+// Get one at: https://console.cloud.google.com/apis/credentials
+// Add http://localhost (or your domain) to Authorized JS origins.
+// ================================================================
+const GOOGLE_CLIENT_ID = '785743667835-upe7u9j5nf40i4e3uth9pj88kh0pq7f2.apps.googleusercontent.com';
+
+// ── Redirect if already logged in ──
+(function() {
+  try {
+    const u = JSON.parse(localStorage.getItem('mp_user') || 'null');
+    if (u && u.email) window.location.replace('index.html');
+  } catch(e) {}
+})();
+
+// ── Live clocks ──
+function updateClocks() {
+  const now = new Date();
+  const fmt = (tz, s) => new Intl.DateTimeFormat('en-US', {
+    hour:'2-digit', minute:'2-digit', second: s ? '2-digit' : undefined,
+    hour12: false, timeZone: tz
+  }).format(now);
+
+  const ny  = fmt('America/New_York', true);
+  const ist = fmt('Asia/Kolkata', true);
+
+  document.getElementById('lcNYTime').textContent  = ny;
+  document.getElementById('lcISTTime').textContent = ist;
+  document.getElementById('brandNYTime').textContent  = ny.slice(0,5);
+  document.getElementById('brandISTTime').textContent = ist.slice(0,5);
+}
+setInterval(updateClocks, 1000);
+updateClocks();
+
+// ── Canvas animated chart background ──
+(function() {
+  const canvas = document.getElementById('bgCanvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, lines;
+
+  function makeLine(idx) {
+    const pts = [];
+    let y = H * (0.15 + (idx / 7) * 0.7);
+    for (let x = -60; x <= W + 120; x += 55) {
+      y += (Math.random() - 0.49) * 38;
+      y = Math.max(H * 0.08, Math.min(H * 0.92, y));
+      pts.push({ x, y });
+    }
+    return {
+      pts, offset: 0,
+      color: idx % 3 === 0 ? '#58a6ff' : idx % 3 === 1 ? '#ff7b4f' : '#a78bfa',
+      speed: 0.18 + Math.random() * 0.25,
+      alpha: 0.12 + Math.random() * 0.18
+    };
+  }
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+    lines = Array.from({ length: 7 }, (_, i) => makeLine(i));
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Subtle grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.018)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 70) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    for (let y = 0; y < H; y += 70) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+
+    // Flowing lines
+    lines.forEach(line => {
+      const shift = line.offset % 55;
+      ctx.beginPath();
+      ctx.strokeStyle = line.color;
+      ctx.lineWidth = 1.4;
+      ctx.globalAlpha = line.alpha;
+      line.pts.forEach((pt, i) => {
+        const x = pt.x - shift;
+        i === 0 ? ctx.moveTo(x, pt.y) : ctx.lineTo(x, pt.y);
+      });
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      line.offset += line.speed;
+      if (line.offset >= 55) {
+        line.offset = 0;
+        line.pts.shift();
+        const last = line.pts[line.pts.length - 1];
+        let ny = last.y + (Math.random() - 0.49) * 38;
+        ny = Math.max(H * 0.08, Math.min(H * 0.92, ny));
+        line.pts.push({ x: last.x + 55, y: ny });
+      }
+    });
+
+    requestAnimationFrame(draw);
+  }
+
+  resize();
+  window.addEventListener('resize', resize);
+  draw();
+})();
+
+// ── Floating ticker pills ──
+(function() {
+  const tickers = [
+    { sym:'AAPL',       val:'$189.30', chg:'+1.2%', up:true  },
+    { sym:'RELIANCE',   val:'₹2,845',  chg:'+0.8%', up:true  },
+    { sym:'NVDA',       val:'$875.40', chg:'+3.1%', up:true  },
+    { sym:'TCS',        val:'₹3,920',  chg:'-0.4%', up:false },
+    { sym:'TSLA',       val:'$248.50', chg:'-1.8%', up:false },
+    { sym:'HDFCBANK',   val:'₹1,650',  chg:'+0.6%', up:true  },
+    { sym:'MSFT',       val:'$415.20', chg:'+0.9%', up:true  },
+    { sym:'INFY',       val:'₹1,780',  chg:'-0.3%', up:false },
+    { sym:'GOOGL',      val:'$174.30', chg:'+1.5%', up:true  },
+    { sym:'BAJFINANCE', val:'₹7,120',  chg:'+1.1%', up:true  },
+    { sym:'META',       val:'$497.20', chg:'+1.3%', up:true  },
+    { sym:'ICICIBANK',  val:'₹1,124',  chg:'+1.1%', up:true  },
+    { sym:'AMZN',       val:'$198.50', chg:'+1.1%', up:true  },
+    { sym:'TITAN',      val:'₹3,374',  chg:'-0.7%', up:false },
+  ];
+  const wrap = document.getElementById('floatPills');
+
+  function spawn() {
+    const t = tickers[Math.floor(Math.random() * tickers.length)];
+    const el = document.createElement('div');
+    el.className = 'fpill';
+    el.style.left = (Math.random() * 88) + '%';
+    el.style.bottom = '-30px';
+    const dur = 14 + Math.random() * 10;
+    el.style.animationDuration = dur + 's';
+    el.innerHTML = `<span class="fsym">${t.sym}</span><span>${t.val}</span><span class="fchg ${t.up ? 'up' : 'dn'}">${t.chg}</span>`;
+    wrap.appendChild(el);
+    setTimeout(() => el.remove(), dur * 1000 + 200);
+  }
+
+  spawn();
+  setInterval(spawn, 2800);
+})();
+
+// ── Google Sign-In ──
+function showError(msg) {
+  const el = document.getElementById('lcError');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+function handleCredentialResponse(response) {
+  try {
+    const b64 = response.credential.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(b64));
+    const user = {
+      name:     payload.name    || 'User',
+      email:    payload.email   || '',
+      picture:  payload.picture || '',
+      sub:      payload.sub     || '',
+      loginAt:  Date.now()
+    };
+    localStorage.setItem('mp_user', JSON.stringify(user));
+
+    // Show loading state
+    document.getElementById('signInSection').style.display = 'none';
+    const ul = document.getElementById('lcUserLoading');
+    ul.classList.add('show');
+    document.getElementById('lcUserAvatar').src  = user.picture;
+    document.getElementById('lcUserName').textContent  = user.name;
+    document.getElementById('lcUserEmail').textContent = user.email;
+
+    setTimeout(() => window.location.replace('index.html'), 1100);
+  } catch (e) {
+    showError('Sign-in failed — could not read account info. Please try again.');
+  }
+}
+
+function initGoogleSignIn() {
+  const fallbackEl = document.getElementById('googleFallback');
+
+  if (GOOGLE_CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com') {
+    // Show setup instructions
+    document.getElementById('googleBtnContainer').style.display = 'none';
+    fallbackEl.innerHTML = `
+      <div class="setup-notice">
+        <i class="fa-solid fa-key"></i>
+        <strong>One-time Setup Required</strong><br>
+        Add your Google OAuth Client ID to <code>login.html</code> (line 1 of the script).<br><br>
+        <a href="https://console.cloud.google.com/apis/credentials" target="_blank">
+          → Get Client ID from Google Cloud Console
+        </a><br>
+        <span style="font-size:10px;margin-top:6px;display:block;color:var(--text3)">
+          Also add <code>http://localhost</code> to Authorized JavaScript origins, or host the site online.
+        </span>
+      </div>`;
+    return;
+  }
+
+  if (typeof google === 'undefined' || !google.accounts) {
+    // Google script failed to load — show custom button
+    document.getElementById('googleBtnContainer').style.display = 'none';
+    fallbackEl.innerHTML = `
+      <button class="google-btn-custom" onclick="triggerGoogleSignIn()">
+        <svg width="18" height="18" viewBox="0 0 18 18">
+          <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.566 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+          <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+          <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+          <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+        </svg>
+        Continue with Google
+      </button>`;
+    return;
+  }
+
+  try {
+    google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: handleCredentialResponse,
+      auto_select: false,
+      cancel_on_tap_outside: true,
+      ux_mode: 'popup'
+    });
+
+    google.accounts.id.renderButton(
+      document.getElementById('googleBtnContainer'),
+      {
+        theme: 'filled_black',
+        size: 'large',
+        text: 'signin_with',
+        shape: 'rectangular',
+        width: 320,
+        logo_alignment: 'left'
+      }
+    );
+  } catch(e) {
+    showError('Could not initialize Google Sign-In. ' + e.message);
+  }
+}
+
+function triggerGoogleSignIn() {
+  if (typeof google !== 'undefined' && google.accounts) {
+    google.accounts.id.prompt();
+  } else {
+    showError('Google Sign-In unavailable. Please serve this site from a web server (not file://).');
+  }
+}
+
+// Wait for Google script + DOM to be ready
+window.addEventListener('load', function() {
+  setTimeout(initGoogleSignIn, 400);
+});
+</script>
+</body>
+</html>

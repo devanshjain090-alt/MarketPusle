@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MarketPulse — Portfolio & Market Terminal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<script>
+(function(){
+  try {
+    var u = JSON.parse(localStorage.getItem('mp_user') || 'null');
+    if (!u || !u.email) window.location.replace('login.html');
+  } catch(e) { window.location.replace('login.html'); }
+})();
+</script>
+
+<!-- ============================== SIDEBAR ============================== -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <svg width="20" height="18" viewBox="0 0 20 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <polyline points="1,16 6,9 10,12 19,2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="19" cy="2" r="2.2" fill="currentColor"/>
+      </svg>
+    </div>
+    <div class="logo-text">
+      <span class="logo-name">MarketPulse</span>
+      <span class="logo-tagline">Terminal</span>
+    </div>
+  </div>
+
+  <div class="sidebar-nav">
+    <a class="nav-item active" data-section="dashboard" data-label="Dashboard">
+      <i class="fa-solid fa-gauge-high"></i>
+      <span>Dashboard</span>
+    </a>
+    <div class="nav-divider">Markets</div>
+    <a class="nav-item" data-section="us-terminal" data-label="US Terminal">
+      <span class="nav-flag">🇺🇸</span>
+      <span>US Terminal</span>
+      <span class="nav-badge us">NYSE · NASDAQ</span>
+    </a>
+    <a class="nav-item" data-section="india-terminal" data-label="India Terminal">
+      <span class="nav-flag">🇮🇳</span>
+      <span>India Terminal</span>
+      <span class="nav-badge india">NSE · BSE</span>
+    </a>
+    <div class="nav-divider">Tools</div>
+    <a class="nav-item" data-section="portfolio" data-label="Portfolio">
+      <i class="fa-solid fa-briefcase"></i>
+      <span>Portfolio</span>
+    </a>
+    <a class="nav-item" data-section="xray" data-label="Portfolio X-Ray">
+      <i class="fa-solid fa-magnifying-glass-chart"></i>
+      <span>Portfolio X-Ray</span>
+    </a>
+    <a class="nav-item" data-section="screener" data-label="Screener">
+      <i class="fa-solid fa-sliders"></i>
+      <span>Screener</span>
+    </a>
+    <a class="nav-item" data-section="picks" data-label="Top Picks">
+      <i class="fa-solid fa-trophy"></i>
+      <span>Top Picks</span>
+      <span class="nav-badge" style="background:rgba(63,185,80,0.15);color:var(--green)">Daily</span>
+    </a>
+    <a class="nav-item" data-section="smart-money" data-label="Smart Money">
+      <i class="fa-solid fa-building-columns"></i>
+      <span>Smart Money</span>
+      <span class="nav-badge" style="background:rgba(210,153,34,0.15);color:var(--yellow)">Live</span>
+    </a>
+    <a class="nav-item" data-section="watchlist" data-label="Watchlist">
+      <i class="fa-solid fa-star"></i>
+      <span>Watchlist</span>
+    </a>
+    <div class="nav-divider">Assistant</div>
+    <a class="nav-item" data-section="ai-chat" data-label="AI Chat">
+      <i class="fa-solid fa-robot"></i>
+      <span>AI Chat</span>
+      <span class="nav-badge" style="background:rgba(124,58,237,0.15);color:#a78bfa">Gemini</span>
+    </a>
+  </div>
+
+  <div class="sidebar-clocks">
+    <div class="clock-row">
+      <div class="clock-flag">🇺🇸</div>
+      <div class="clock-info">
+        <span class="clock-label">New York</span>
+        <span class="clock-time" id="nyTime">--:--:--</span>
+      </div>
+      <span class="market-dot" id="nyDot"></span>
+    </div>
+    <div class="clock-row">
+      <div class="clock-flag">🇮🇳</div>
+      <div class="clock-info">
+        <span class="clock-label">Mumbai</span>
+        <span class="clock-time" id="istTime">--:--:--</span>
+      </div>
+      <span class="market-dot" id="istDot"></span>
+    </div>
+  </div>
+
+  <button class="sidebar-toggle-btn" id="sidebarToggle">
+    <i class="fa-solid fa-chevron-left" id="sidebarToggleIcon"></i>
+    <span class="sidebar-toggle-label">Collapse</span>
+  </button>
+</nav>
+
+<!-- ============================== MAIN ============================== -->
+<main class="main" id="main">
+
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="topbar-search-wrap">
+      <i class="fa-solid fa-search search-icon"></i>
+      <input type="text" id="globalSearch" class="topbar-search" placeholder="Search any stock... AAPL, RELIANCE, TSLA">
+      <div class="search-dropdown" id="searchDropdown"></div>
+    </div>
+    <div class="topbar-pills">
+      <div class="index-pill" id="pillSP500"><span class="pill-name">S&P 500</span><span class="pill-val">—</span><span class="pill-chg">—</span></div>
+      <div class="index-pill" id="pillNasdaq"><span class="pill-name">NASDAQ</span><span class="pill-val">—</span><span class="pill-chg">—</span></div>
+      <div class="index-pill india" id="pillNifty"><span class="pill-name">NIFTY 50</span><span class="pill-val">—</span><span class="pill-chg">—</span></div>
+      <div class="index-pill india" id="pillSensex"><span class="pill-name">SENSEX</span><span class="pill-val">—</span><span class="pill-chg">—</span></div>
+    </div>
+    <button class="topbar-refresh" id="refreshBtn" title="Refresh Prices">
+      <i class="fa-solid fa-rotate-right"></i>
+    </button>
+    <div class="topbar-user" id="topbarUser" title="Account">
+      <div class="topbar-avatar-wrap">
+        <img id="topbarAvatarImg" class="topbar-avatar" src="" alt="">
+        <span class="topbar-avatar-icon"><i class="fa-solid fa-user"></i></span>
+      </div>
+      <div class="user-dropdown" id="userDropdown">
+        <div class="ud-profile">
+          <img id="udAvatarImg" class="ud-avatar" src="" alt="" onerror="this.style.display='none'">
+          <div>
+            <div class="ud-name"  id="udName">—</div>
+            <div class="ud-email" id="udEmail">—</div>
+          </div>
+        </div>
+        <div class="ud-divider"></div>
+        <button class="ud-signout" onclick="signOut()">
+          <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ====== BREAKING NEWS BANNER ====== -->
+  <div class="breaking-banner" id="breakingBanner">
+    <div class="breaking-left">
+      <span class="breaking-label-pill" id="breakingLabel">🚨 BREAKING</span>
+      <span class="breaking-headline" id="breakingHeadline"></span>
+    </div>
+    <div class="breaking-right">
+      <div class="breaking-stocks-wrap" id="breakingStocksWrap"></div>
+      <span class="breaking-time" id="breakingTime"></span>
+      <button class="breaking-close" onclick="closeBanner()" title="Dismiss">×</button>
+    </div>
+  </div>
+
+  <!-- =================== DASHBOARD =================== -->
+  <section class="page active" id="dashboard">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-subtitle">Live market overview &amp; portfolio snapshot</p>
+      </div>
+    </div>
+
+    <div class="index-cards-row">
+      <div class="index-card" id="card-sp500">
+        <div class="icard-left"><span class="icard-flag">🇺🇸</span><span class="icard-name">S&P 500</span></div>
+        <div class="icard-right"><span class="icard-price" id="sp500price">Loading…</span><span class="icard-chg" id="sp500chg">—</span></div>
+      </div>
+      <div class="index-card" id="card-nasdaq">
+        <div class="icard-left"><span class="icard-flag">🇺🇸</span><span class="icard-name">NASDAQ</span></div>
+        <div class="icard-right"><span class="icard-price" id="nasdaqprice">Loading…</span><span class="icard-chg" id="nasdaqchg">—</span></div>
+      </div>
+      <div class="index-card" id="card-dow">
+        <div class="icard-left"><span class="icard-flag">🇺🇸</span><span class="icard-name">DOW JONES</span></div>
+        <div class="icard-right"><span class="icard-price" id="dowprice">Loading…</span><span class="icard-chg" id="dowchg">—</span></div>
+      </div>
+      <div class="index-card india" id="card-nifty">
+        <div class="icard-left"><span class="icard-flag">🇮🇳</span><span class="icard-name">NIFTY 50</span></div>
+        <div class="icard-right"><span class="icard-price" id="niftyprice">Loading…</span><span class="icard-chg" id="niftychg">—</span></div>
+      </div>
+      <div class="index-card india" id="card-sensex">
+        <div class="icard-left"><span class="icard-flag">🇮🇳</span><span class="icard-name">SENSEX</span></div>
+        <div class="icard-right"><span class="icard-price" id="sensexprice">Loading…</span><span class="icard-chg" id="sensexchg">—</span></div>
+      </div>
+      <div class="index-card india" id="card-bnifty">
+        <div class="icard-left"><span class="icard-flag">🇮🇳</span><span class="icard-name">BANK NIFTY</span></div>
+        <div class="icard-right"><span class="icard-price" id="bniftyprice">Loading…</span><span class="icard-chg" id="bniftychg">—</span></div>
+      </div>
+    </div>
+
+    <!-- BREAKING NEWS FEED - full width before grid -->
+    <div class="card dash-news-feed" id="dashNewsFeedCard">
+      <div class="card-header">
+        <h3><span class="live-dot"></span> Breaking News &amp; Alerts</h3>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="news-unread-badge" id="newsUnreadBadge" style="display:none">0 new</span>
+          <button class="btn-link" onclick="markAllNewsRead()">Mark all read</button>
+        </div>
+      </div>
+      <div class="news-feed-scroll" id="newsFeedList">
+        <div class="empty-state" style="padding:20px"><i class="fa-solid fa-satellite-dish"></i><p>Scanning for news…</p></div>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+      <!-- Portfolio Summary -->
+      <div class="card dash-portfolio">
+        <div class="card-header">
+          <h3>Portfolio Summary</h3>
+          <button class="btn-link" onclick="switchSection('portfolio')">View All →</button>
+        </div>
+        <div class="portfolio-hero">
+          <div class="hero-value" id="dashTotalValue">₹0</div>
+          <div class="hero-pnl positive" id="dashTotalPnl">+₹0.00 (+0.00%)</div>
+        </div>
+        <canvas id="dashMiniChart" height="80"></canvas>
+      </div>
+
+      <!-- Top Movers -->
+      <div class="card dash-movers">
+        <div class="card-header">
+          <h3>Top Movers</h3>
+          <div class="pill-tabs">
+            <button class="ptab active" data-movers="gainers">Gainers</button>
+            <button class="ptab" data-movers="losers">Losers</button>
+          </div>
+        </div>
+        <div class="movers-list" id="moversList"></div>
+      </div>
+
+      <!-- Market Overview Widget -->
+      <div class="card dash-market-widget">
+        <div class="card-header"><h3>Live Market Quotes</h3></div>
+        <div class="tradingview-widget-container">
+          <div class="tradingview-widget-container__widget"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-market-quotes.js" async>
+          {
+            "width": "100%","height": 320,"showSymbolLogo": true,
+            "colorTheme": "dark","isTransparent": true,"locale": "en",
+            "symbols": [
+              {"proName":"FOREXCOM:SPXUSD","title":"S&P 500"},
+              {"proName":"NASDAQ:NDX","title":"NASDAQ 100"},
+              {"proName":"NASDAQ:AAPL","title":"Apple"},
+              {"proName":"NASDAQ:NVDA","title":"NVIDIA"},
+              {"proName":"NASDAQ:MSFT","title":"Microsoft"},
+              {"proName":"NASDAQ:TSLA","title":"Tesla"},
+              {"proName":"NSE:NIFTY50","title":"NIFTY 50"},
+              {"proName":"BSE:SENSEX","title":"SENSEX"},
+              {"proName":"NSE:RELIANCE","title":"Reliance"},
+              {"proName":"NSE:TCS","title":"TCS"}
+            ]
+          }
+          </script>
+        </div>
+      </div>
+
+      <!-- Recent Transactions -->
+      <div class="card dash-transactions">
+        <div class="card-header"><h3>Recent Activity</h3></div>
+        <div class="tx-list" id="recentTxList">
+          <div class="empty-state"><i class="fa-regular fa-clock"></i><p>No recent activity</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================== US TERMINAL =================== -->
+  <section class="page" id="us-terminal">
+    <div class="terminal-layout">
+      <div class="terminal-main">
+        <div class="terminal-header us-theme">
+          <div class="term-title">
+            <span class="term-flag">🇺🇸</span>
+            <h2>US Market Terminal</h2>
+            <div class="exchange-pills">
+              <span class="xpill active">NYSE</span>
+              <span class="xpill active">NASDAQ</span>
+            </div>
+          </div>
+          <div class="term-search-bar">
+            <div class="term-search-wrap">
+              <input type="text" id="usSearchInput" placeholder="Search: AAPL, Apple, MSFT…" class="term-input" autocomplete="off">
+              <div class="search-dropdown" id="usSearchDrop"></div>
+            </div>
+            <button class="btn-analyze us-btn" onclick="analyzeUSStock()"><i class="fa-solid fa-chart-line"></i> Analyze</button>
+          </div>
+        </div>
+
+        <div class="stock-bar us-bar" id="usStockBar">
+          <div class="sbar-main">
+            <span class="sbar-symbol" id="usSymbolDisplay">AAPL</span>
+            <span class="sbar-name" id="usNameDisplay">Apple Inc.</span>
+            <span class="sbar-exchange">NASDAQ</span>
+          </div>
+          <div class="sbar-price-block">
+            <span class="sbar-price" id="usPriceDisplay">—</span>
+            <span class="sbar-change" id="usChangeDisplay">—</span>
+          </div>
+          <div class="sbar-actions">
+            <button class="btn-add-port" onclick="openAddModal('us')"><i class="fa-solid fa-plus"></i> Add to Portfolio</button>
+            <button class="btn-watch" onclick="watchCurrent('us')"><i class="fa-regular fa-star"></i> Watch</button>
+          </div>
+        </div>
+
+        <!-- TradingView Chart -->
+        <div class="tv-chart-wrap">
+          <div id="tv_us" style="height:500px"></div>
+        </div>
+
+        <!-- US Terminal News Alert Strip -->
+        <div class="terminal-news-strip us-strip" id="usNewsStrip"></div>
+
+        <!-- Key Stats -->
+        <div class="stats-grid" id="usStatsGrid">
+          <div class="stat-box"><span class="stat-lbl">Open</span><span class="stat-val" id="us-open">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">Prev Close</span><span class="stat-val" id="us-prevclose">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">Day High</span><span class="stat-val positive" id="us-high">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">Day Low</span><span class="stat-val negative" id="us-low">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">Volume</span><span class="stat-val" id="us-vol">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">Avg Volume</span><span class="stat-val" id="us-avgvol">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">Market Cap</span><span class="stat-val" id="us-mcap">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">P/E Ratio</span><span class="stat-val" id="us-pe">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">52W High</span><span class="stat-val positive" id="us-52h">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">52W Low</span><span class="stat-val negative" id="us-52l">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">Div Yield</span><span class="stat-val" id="us-div">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">Beta</span><span class="stat-val" id="us-beta">—</span></div>
+        </div>
+      </div>
+
+      <!-- Right Sidebar -->
+      <div class="terminal-sidebar">
+        <div class="card">
+          <div class="card-header"><h4>Quick Picks — US</h4></div>
+          <div class="quick-grid">
+            <button class="qbtn us" onclick="loadUSQuick('AAPL')">AAPL</button>
+            <button class="qbtn us" onclick="loadUSQuick('MSFT')">MSFT</button>
+            <button class="qbtn us" onclick="loadUSQuick('GOOGL')">GOOGL</button>
+            <button class="qbtn us" onclick="loadUSQuick('AMZN')">AMZN</button>
+            <button class="qbtn us" onclick="loadUSQuick('NVDA')">NVDA</button>
+            <button class="qbtn us" onclick="loadUSQuick('TSLA')">TSLA</button>
+            <button class="qbtn us" onclick="loadUSQuick('META')">META</button>
+            <button class="qbtn us" onclick="loadUSQuick('NFLX')">NFLX</button>
+            <button class="qbtn us" onclick="loadUSQuick('JPM')">JPM</button>
+            <button class="qbtn us" onclick="loadUSQuick('V')">V</button>
+            <button class="qbtn us" onclick="loadUSQuick('WMT')">WMT</button>
+            <button class="qbtn us" onclick="loadUSQuick('BAC')">BAC</button>
+            <button class="qbtn us" onclick="loadUSQuick('DIS')">DIS</button>
+            <button class="qbtn us" onclick="loadUSQuick('AMD')">AMD</button>
+            <button class="qbtn us" onclick="loadUSQuick('INTC')">INTC</button>
+            <button class="qbtn us" onclick="loadUSQuick('CRM')">CRM</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h4>Market News</h4></div>
+          <div class="tradingview-widget-container">
+            <div class="tradingview-widget-container__widget"></div>
+            <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-timeline.js" async>
+            {"feedMode":"market","market":"stock","isTransparent":true,"displayMode":"compact","width":"100%","height":380,"colorTheme":"dark","locale":"en"}
+            </script>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h4>Economic Calendar</h4></div>
+          <div class="tradingview-widget-container">
+            <div class="tradingview-widget-container__widget"></div>
+            <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
+            {"width":"100%","height":280,"colorTheme":"dark","isTransparent":true,"locale":"en","importanceFilter":"0,1"}
+            </script>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================== INDIA TERMINAL =================== -->
+  <section class="page" id="india-terminal">
+    <div class="terminal-layout">
+      <div class="terminal-main">
+        <div class="terminal-header india-theme">
+          <div class="term-title">
+            <span class="term-flag">🇮🇳</span>
+            <h2>India Market Terminal</h2>
+            <div class="exchange-toggle-group">
+              <button class="xbtn" id="nseBtn" onclick="setIndiaExchange('NSE')">NSE</button>
+              <button class="xbtn active" id="bseBtn" onclick="setIndiaExchange('BSE')">BSE</button>
+            </div>
+          </div>
+          <div class="term-search-bar">
+            <div class="term-search-wrap">
+              <input type="text" id="indiaSearchInput" placeholder="Search: RELIANCE, TCS, INFY…" class="term-input" autocomplete="off">
+              <div class="search-dropdown" id="indiaSearchDrop"></div>
+            </div>
+            <button class="btn-analyze india-btn" onclick="analyzeIndiaStock()"><i class="fa-solid fa-chart-line"></i> Analyze</button>
+            <button class="btn-analyze india-btn" id="indiaAIRefreshBtn" onclick="refreshIndiaAI()" title="Fetch live price via Gemini AI + Google Search" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);margin-left:6px"><i class="fa-solid fa-robot"></i> AI Refresh</button>
+          </div>
+        </div>
+
+        <div class="stock-bar india-bar" id="indiaStockBar">
+          <div class="sbar-main">
+            <span class="sbar-symbol" id="indiaSymbolDisplay">RELIANCE</span>
+            <span class="sbar-name" id="indiaNameDisplay">Reliance Industries Ltd.</span>
+            <span class="sbar-exchange india-ex" id="indiaExDisplay">NSE</span>
+          </div>
+          <div class="sbar-price-block">
+            <span class="sbar-price" id="indiaPriceDisplay">—</span>
+            <span class="sbar-change" id="indiaChangeDisplay">—</span>
+          </div>
+          <div class="sbar-actions">
+            <button class="btn-add-port india-add" onclick="openAddModal('india')"><i class="fa-solid fa-plus"></i> Add to Portfolio</button>
+            <button class="btn-watch" onclick="watchCurrent('india')"><i class="fa-regular fa-star"></i> Watch</button>
+          </div>
+        </div>
+
+        <!-- TradingView Chart India -->
+        <div class="tv-chart-wrap">
+          <div id="tv_india" style="height:500px"></div>
+        </div>
+
+        <!-- India Terminal News Alert Strip -->
+        <div class="terminal-news-strip india-strip" id="indiaNewsStrip"></div>
+
+        <!-- Key Stats India -->
+        <div class="stats-grid" id="indiaStatsGrid">
+          <div class="stat-box"><span class="stat-lbl">Open</span><span class="stat-val" id="in-open">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">Prev Close</span><span class="stat-val" id="in-prevclose">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">Day High</span><span class="stat-val positive" id="in-high">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">Day Low</span><span class="stat-val negative" id="in-low">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">Volume</span><span class="stat-val" id="in-vol">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">Avg Volume</span><span class="stat-val" id="in-avgvol">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">Market Cap</span><span class="stat-val" id="in-mcap">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">P/E Ratio</span><span class="stat-val" id="in-pe">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">52W High</span><span class="stat-val positive" id="in-52h">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">52W Low</span><span class="stat-val negative" id="in-52l">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">Delivery %</span><span class="stat-val" id="in-delivery">—</span></div>
+          <div class="stat-box"><span class="stat-lbl">India VIX</span><span class="stat-val" id="in-vix">—</span></div>
+        </div>
+      </div>
+
+      <!-- India Right Sidebar -->
+      <div class="terminal-sidebar">
+        <div class="card">
+          <div class="card-header"><h4>Quick Picks — India</h4></div>
+          <div class="quick-grid">
+            <button class="qbtn in" onclick="loadIndiaQuick('RELIANCE')">RELIANCE</button>
+            <button class="qbtn in" onclick="loadIndiaQuick('TCS')">TCS</button>
+            <button class="qbtn in" onclick="loadIndiaQuick('INFY')">INFY</button>
+            <button class="qbtn in" onclick="loadIndiaQuick('HDFCBANK')">HDFCBANK</button>
+            <button class="qbtn in" onclick="loadIndiaQuick('ICICIBANK')">ICICIBANK</button>
+            <button class="qbtn in" onclick="loadIndiaQuick('WIPRO')">WIPRO</button>
+            <button class="qbtn in" onclick="loadIndiaQuick('TATAMOTORS')">TATAMOTORS</button>
+            <button class="qbtn in" onclick="loadIndiaQuick('BAJFINANCE')">BAJFINANCE</button>
+            <button class="qbtn in" onclick="loadIndiaQuick('ADANIENT')">ADANIENT</button>
+            <button class="qbtn in" onclick="loadIndiaQuick('SUNPHARMA')">SUNPHARMA</button>
+            <button class="qbtn in" onclick="loadIndiaQuick('LT')">L&T</button>
+            <button class="qbtn in" onclick="loadIndiaQuick('MARUTI')">MARUTI</button>
+            <button class="qbtn in" onclick="loadIndiaQuick('KOTAKBANK')">KOTAKBANK</button>
+            <button class="qbtn in" onclick="loadIndiaQuick('ASIANPAINT')">ASIANPAINT</button>
+            <button class="qbtn in" onclick="loadIndiaQuick('AXISBANK')">AXISBANK</button>
+            <button class="qbtn in" onclick="loadIndiaQuick('HINDUNILVR')">HUL</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h4>NSE Sector Heatmap</h4></div>
+          <div class="sector-heatmap" id="sectorHeatmap"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h4>F&amp;O Snapshot</h4></div>
+          <div class="fno-grid">
+            <div class="fno-item"><span class="fno-lbl">NIFTY Lot</span><span class="fno-val">75</span></div>
+            <div class="fno-item"><span class="fno-lbl">BN Lot</span><span class="fno-val">30</span></div>
+            <div class="fno-item"><span class="fno-lbl">PCR (NIFTY)</span><span class="fno-val" id="pcrVal">0.98</span></div>
+            <div class="fno-item"><span class="fno-lbl">India VIX</span><span class="fno-val" id="vixVal">—</span></div>
+            <div class="fno-item"><span class="fno-lbl">Next Expiry</span><span class="fno-val" id="nextExpiry">—</span></div>
+            <div class="fno-item"><span class="fno-lbl">Max Pain</span><span class="fno-val" id="maxPain">—</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h4><span class="live-dot"></span> Market News — India</h4>
+          </div>
+          <div class="india-news-panel" id="indiaTerminalNewsList">
+            <div class="empty-state" style="padding:20px"><i class="fa-solid fa-satellite-dish"></i><p>Scanning for India news…</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================== PORTFOLIO =================== -->
+  <section class="page" id="portfolio">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">My Portfolio</h1>
+        <p class="page-subtitle">Track your holdings across US &amp; Indian markets</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn-primary" onclick="openAddModal('us')"><i class="fa-solid fa-plus"></i> Add US Stock</button>
+        <button class="btn-india" onclick="openAddModal('india')"><i class="fa-solid fa-plus"></i> Add India Stock</button>
+        <button class="btn-outline" id="livePricesBtn" onclick="fetchLivePrices()"><i class="fa-solid fa-rotate"></i> Live Prices</button>
+        <button class="btn-outline" onclick="exportExcel()"><i class="fa-solid fa-file-excel"></i> Export Excel</button>
+        <button class="btn-outline" onclick="openImportModal()"><i class="fa-solid fa-file-import"></i> Import</button>
+        <button class="btn-outline" onclick="switchSection('xray')"><i class="fa-solid fa-magnifying-glass-chart"></i> X-Ray</button>
+        <button class="btn-roast" onclick="openRoastModal()"><i class="fa-solid fa-fire"></i> Roast My Portfolio</button>
+      </div>
+    </div>
+
+    <!-- ── Multi-Portfolio Manager ── -->
+    <div class="wl-manager">
+      <div class="wl-tabs-wrap">
+        <span class="wl-tabs-label"><i class="fa-solid fa-briefcase"></i> Portfolios</span>
+        <div class="wl-tabs" id="pfTabs"><!-- rendered by JS --></div>
+        <button class="wl-new-btn" onclick="openPfNameModal('create')">
+          <i class="fa-solid fa-plus"></i> New Portfolio
+        </button>
+      </div>
+      <div class="wl-toolbar">
+        <div class="wl-toolbar-left">
+          <span class="wl-active-name" id="pfActiveName">My Portfolio</span>
+          <span class="wl-stock-count" id="pfActiveCount">0 holdings</span>
+        </div>
+        <div class="wl-toolbar-right">
+          <button class="btn-outline" onclick="openPfNameModal('rename')" title="Rename this portfolio"><i class="fa-solid fa-pen"></i> Rename</button>
+          <button class="btn-outline" onclick="duplicatePortfolio()" title="Duplicate this portfolio"><i class="fa-regular fa-copy"></i></button>
+          <button class="btn-danger-sm" onclick="deleteActivePortfolio()" title="Delete this portfolio"><i class="fa-solid fa-trash"></i></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="port-overview-row">
+      <div class="pov-card total">
+        <div class="pov-icon"><i class="fa-solid fa-wallet"></i></div>
+        <div class="pov-info"><span class="pov-label">Total Value</span><span class="pov-value" id="portTotalVal">₹0.00</span><span class="pov-sub positive" id="portTotalPnl">+₹0.00 (0%)</span></div>
+      </div>
+      <div class="pov-card">
+        <div class="pov-icon us-icon"><i class="fa-solid fa-indian-rupee-sign"></i></div>
+        <div class="pov-info"><span class="pov-label">US Portfolio (₹)</span><span class="pov-value" id="portUSVal">₹0.00</span><span class="pov-sub" id="portUSPnl">—</span></div>
+      </div>
+      <div class="pov-card">
+        <div class="pov-icon india-icon"><i class="fa-solid fa-indian-rupee-sign"></i></div>
+        <div class="pov-info"><span class="pov-label">India Portfolio</span><span class="pov-value" id="portIndiaVal">₹0.00</span><span class="pov-sub" id="portIndiaPnl">—</span></div>
+      </div>
+      <div class="pov-card">
+        <div class="pov-icon"><i class="fa-solid fa-arrow-trend-up"></i></div>
+        <div class="pov-info"><span class="pov-label">Day P&amp;L</span><span class="pov-value positive" id="portDayPnl">₹0.00</span></div>
+      </div>
+      <div class="pov-card">
+        <div class="pov-icon"><i class="fa-solid fa-layer-group"></i></div>
+        <div class="pov-info"><span class="pov-label">Holdings</span><span class="pov-value" id="portHoldingsCount">0</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3>Holdings</h3>
+        <div class="filter-pills">
+          <button class="fpill active" data-hfilter="all">All</button>
+          <button class="fpill" data-hfilter="us">🇺🇸 US</button>
+          <button class="fpill" data-hfilter="india">🇮🇳 India</button>
+          <button class="fpill" data-hfilter="profit">Profit</button>
+          <button class="fpill" data-hfilter="loss">Loss</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Symbol</th><th>Name</th><th>Market</th><th>Qty</th>
+              <th>Avg Buy</th><th>LTP</th><th>Invested</th><th>Curr Value</th>
+              <th>P&amp;L</th><th>P&amp;L %</th><th>Day Chg</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="holdingsBody">
+            <tr><td colspan="12" class="empty-td">
+              <div class="empty-state"><i class="fa-solid fa-briefcase"></i><p>No holdings yet. Add your first stock!</p></div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="charts-row">
+      <div class="card chart-card">
+        <div class="chart-card-label">Holdings</div>
+        <div class="chart-wrap"><canvas id="allocChart"></canvas></div>
+      </div>
+      <div class="card chart-card">
+        <div class="chart-card-label">Market Split</div>
+        <div class="chart-wrap"><canvas id="mktSplitChart"></canvas></div>
+      </div>
+      <div class="card chart-card">
+        <div class="chart-card-label">Sectors</div>
+        <div class="chart-wrap"><canvas id="sectorBreakChart"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================== SCREENER =================== -->
+  <section class="page" id="screener">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Stock Screener</h1>
+        <p class="page-subtitle">Filter &amp; discover stocks across markets</p>
+      </div>
+      <div class="screener-market-tabs">
+        <button class="smtab active" data-smkt="us" onclick="setScreenerMkt('us')">🇺🇸 US Stocks</button>
+        <button class="smtab" data-smkt="india" onclick="setScreenerMkt('india')">🇮🇳 Indian Stocks</button>
+      </div>
+    </div>
+
+    <!-- US Screener -->
+    <div id="tv-screener-us">
+      <div class="tradingview-widget-container">
+        <div class="tradingview-widget-container__widget"></div>
+        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-screener.js" async>
+        {
+          "width": "100%",
+          "height": 720,
+          "defaultColumn": "overview",
+          "defaultScreen": "most_capitalized",
+          "market": "america",
+          "showToolbar": true,
+          "colorTheme": "dark",
+          "locale": "en",
+          "isTransparent": true
+        }
+        </script>
+      </div>
+    </div>
+
+    <!-- India Screener -->
+    <div id="tv-screener-india" style="display:none">
+      <div class="tradingview-widget-container">
+        <div class="tradingview-widget-container__widget"></div>
+        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-screener.js" async>
+        {
+          "width": "100%",
+          "height": 720,
+          "defaultColumn": "overview",
+          "defaultScreen": "most_capitalized",
+          "market": "india",
+          "showToolbar": true,
+          "colorTheme": "dark",
+          "locale": "en",
+          "isTransparent": true
+        }
+        </script>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================== TOP PICKS =================== -->
+  <section class="page" id="picks">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Daily Top Picks</h1>
+        <p class="page-subtitle">Fundamental scoring across Valuation · Quality · Income · Momentum · Growth &nbsp;·&nbsp; Updated <span id="picksLastUpdated">today</span></p>
+      </div>
+      <div class="page-actions">
+        <div class="picks-market-tabs">
+          <button class="pkTab active" data-pkt="us" onclick="setPicksMarket('us')">🇺🇸 US Stocks</button>
+          <button class="pkTab" data-pkt="india" onclick="setPicksMarket('india')">🇮🇳 Indian Stocks</button>
+        </div>
+        <button class="btn-outline" onclick="refreshPicks(true)" id="picksRefreshBtn" title="Refresh with live data">
+          <i class="fa-solid fa-rotate-right"></i> Refresh
+        </button>
+      </div>
+    </div>
+
+    <!-- Category filter row -->
+    <div class="picks-cat-row">
+      <div class="picks-cat-tabs">
+        <button class="pkCatTab active" data-cat="all"    onclick="setPicksCat('all')"><i class="fa-solid fa-th-large"></i> All Picks</button>
+        <button class="pkCatTab"        data-cat="value"  onclick="setPicksCat('value')"><i class="fa-solid fa-scale-balanced"></i> Value</button>
+        <button class="pkCatTab"        data-cat="growth" onclick="setPicksCat('growth')"><i class="fa-solid fa-arrow-trend-up"></i> Growth</button>
+        <button class="pkCatTab"        data-cat="income" onclick="setPicksCat('income')"><i class="fa-solid fa-coins"></i> Income</button>
+      </div>
+      <div class="picks-live-badge" id="picksLiveBadge" style="display:none">
+        <span class="live-dot"></span> Live data
+      </div>
+    </div>
+
+    <!-- Picks cards grid -->
+    <div class="picks-grid" id="picksGrid">
+      <div class="empty-state" style="grid-column:1/-1;padding:60px 20px">
+        <i class="fa-solid fa-circle-notch fa-spin"></i>
+        <p>Computing recommendations…</p>
+      </div>
+    </div>
+
+    <!-- Scoring methodology -->
+    <div class="card picks-method-card">
+      <div class="card-header"><h3><i class="fa-solid fa-flask" style="color:var(--us);margin-right:6px"></i>Scoring Methodology</h3></div>
+      <div class="picks-method-body">
+        <div class="method-item">
+          <span class="method-icon" style="background:var(--us-dim);color:var(--us)"><i class="fa-solid fa-calculator"></i></span>
+          <div><strong>Valuation — 30 pts</strong><p>P/E ratio benchmarked by tier, price position within 52-week range</p></div>
+        </div>
+        <div class="method-item">
+          <span class="method-icon" style="background:var(--green-dim);color:var(--green)"><i class="fa-solid fa-shield-halved"></i></span>
+          <div><strong>Quality — 25 pts</strong><p>Market cap stability, beta risk profile, average daily liquidity</p></div>
+        </div>
+        <div class="method-item">
+          <span class="method-icon" style="background:rgba(210,153,34,0.15);color:var(--yellow)"><i class="fa-solid fa-coins"></i></span>
+          <div><strong>Income — 20 pts</strong><p>Dividend yield tier — rewards consistent payers and high-yield stocks</p></div>
+        </div>
+        <div class="method-item">
+          <span class="method-icon" style="background:var(--india-dim);color:var(--india)"><i class="fa-solid fa-chart-line"></i></span>
+          <div><strong>Momentum — 15 pts</strong><p>1-day price change direction and volume relative to 3-month average</p></div>
+        </div>
+        <div class="method-item">
+          <span class="method-icon" style="background:rgba(188,140,255,0.15);color:#bc8cff"><i class="fa-solid fa-seedling"></i></span>
+          <div><strong>Growth — 10 pts</strong><p>Proximity to 52-week high as a trend-strength signal</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================== PORTFOLIO X-RAY =================== -->
+  <section class="page" id="xray">
+    <div class="page-header">
+      <div>
+        <h2 class="page-title"><i class="fa-solid fa-magnifying-glass-chart" style="color:#a78bfa"></i> Portfolio X-Ray</h2>
+        <p class="page-subtitle">True exposure including ETF &amp; index fund look-through · Hidden concentration detector</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn-outline" onclick="runXRay()"><i class="fa-solid fa-rotate"></i> Re-analyze</button>
+      </div>
+    </div>
+
+    <!-- Portfolio selector -->
+    <div class="xray-portfolio-selector" id="xrayPortfolioSelector"></div>
+
+    <!-- Empty state (no portfolio) -->
+    <div class="empty-state full-empty" id="xrayEmpty" style="display:none">
+      <i class="fa-solid fa-briefcase"></i>
+      <p>Your portfolio is empty — add some holdings first, then come back</p>
+      <button class="btn-primary" style="margin-top:12px" onclick="switchSection('portfolio')"><i class="fa-solid fa-plus"></i> Go to Portfolio</button>
+    </div>
+
+    <!-- Results (hidden until analysis) -->
+    <div id="xrayResults" style="display:none">
+
+      <!-- Concentration alert banner -->
+      <div class="xray-alert" id="xrayAlert"></div>
+
+      <!-- Summary strip -->
+      <div class="xray-summary-row">
+        <div class="xray-sum-card">
+          <div class="xray-sum-icon"><i class="fa-solid fa-layer-group"></i></div>
+          <div><div class="xray-sum-label">Total Holdings</div><div class="xray-sum-val" id="xrTotalHoldings">—</div></div>
+        </div>
+        <div class="xray-sum-card">
+          <div class="xray-sum-icon" style="color:#f97316;background:rgba(249,115,22,0.12)"><i class="fa-solid fa-cubes-stacked"></i></div>
+          <div><div class="xray-sum-label">ETFs / Index Funds</div><div class="xray-sum-val" id="xrETFCount">—</div></div>
+        </div>
+        <div class="xray-sum-card">
+          <div class="xray-sum-icon" style="color:var(--us);background:var(--us-dim)"><i class="fa-solid fa-chart-simple"></i></div>
+          <div><div class="xray-sum-label">Direct Stocks</div><div class="xray-sum-val" id="xrDirectCount">—</div></div>
+        </div>
+        <div class="xray-sum-card">
+          <div class="xray-sum-icon" style="color:#a78bfa;background:rgba(167,139,250,0.12)"><i class="fa-solid fa-sitemap"></i></div>
+          <div><div class="xray-sum-label">Sectors Exposed</div><div class="xray-sum-val" id="xrSectorCount">—</div></div>
+        </div>
+        <div class="xray-sum-card">
+          <div class="xray-sum-icon" style="color:var(--red);background:var(--red-dim)"><i class="fa-solid fa-circle-dot"></i></div>
+          <div><div class="xray-sum-label">Stock Overlaps</div><div class="xray-sum-val" id="xrOverlapCount">—</div></div>
+        </div>
+      </div>
+
+      <!-- Main grid: sector bars + overlaps -->
+      <div class="xray-main-grid">
+
+        <!-- True sector exposure bars -->
+        <div class="card">
+          <div class="card-header">
+            <h3>True Sector Exposure</h3>
+            <div class="xray-legend">
+              <span class="xray-legend-item"><span class="xray-legend-swatch direct"></span>Direct holdings</span>
+              <span class="xray-legend-item"><span class="xray-legend-swatch etf"></span>Via ETF look-through</span>
+            </div>
+          </div>
+          <div class="xray-bars-wrap" id="xraySectorBars"></div>
+        </div>
+
+        <!-- Overlap alerts -->
+        <div class="card xray-overlap-panel">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-circle-dot" style="color:var(--red);margin-right:6px"></i>Overlap Alerts</h3>
+            <span class="xr-sub-label">Held directly &amp; inside ETFs</span>
+          </div>
+          <div id="xrayOverlapList" class="xray-overlap-list"></div>
+        </div>
+
+      </div>
+
+      <!-- Look-through holdings table -->
+      <div class="card">
+        <div class="card-header">
+          <h3>Top Holdings After Look-Through</h3>
+          <span class="xr-sub-label">Actual exposure per stock across all portfolio layers, sorted by total weight</span>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th><th>Symbol</th><th>Company</th><th>Sector</th>
+                <th>Direct %</th><th>Via ETF %</th><th>Total %</th><th>Source</th>
+              </tr>
+            </thead>
+            <tbody id="xrayHoldingsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- =================== SMART MONEY TRACKER =================== -->
+  <section class="page" id="smart-money">
+    <div class="page-header">
+      <div>
+        <h2 class="page-title"><i class="fa-solid fa-building-columns" style="color:var(--yellow)"></i> Smart Money Tracker</h2>
+        <p class="page-subtitle">Institutional block deals, bulk deals &amp; US dark pool flow — auto-refreshes every 30s</p>
+      </div>
+      <div class="page-actions">
+        <span class="sm-live-pill"><span class="sm-live-dot"></span> Live</span>
+        <button class="btn-outline" id="smRefreshBtn" onclick="refreshSmartMoney(true)"><i class="fa-solid fa-rotate"></i> Refresh</button>
+      </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="sm-stats-row">
+      <div class="sm-stat-card buy">
+        <div class="sm-stat-icon"><i class="fa-solid fa-arrow-trend-up"></i></div>
+        <div>
+          <div class="sm-stat-label">Total Buy Flow</div>
+          <div class="sm-stat-val" id="smBuyFlow">—</div>
+          <div class="sm-stat-sub" id="smBuyCount">0 transactions</div>
+        </div>
+      </div>
+      <div class="sm-stat-card sell">
+        <div class="sm-stat-icon"><i class="fa-solid fa-arrow-trend-down"></i></div>
+        <div>
+          <div class="sm-stat-label">Total Sell Flow</div>
+          <div class="sm-stat-val" id="smSellFlow">—</div>
+          <div class="sm-stat-sub" id="smSellCount">0 transactions</div>
+        </div>
+      </div>
+      <div class="sm-stat-card net">
+        <div class="sm-stat-icon"><i class="fa-solid fa-scale-balanced"></i></div>
+        <div>
+          <div class="sm-stat-label">Net Flow</div>
+          <div class="sm-stat-val" id="smNetFlow">—</div>
+          <div class="sm-stat-sub" id="smNetLabel">—</div>
+        </div>
+      </div>
+      <div class="sm-stat-card">
+        <div class="sm-stat-icon" style="color:var(--yellow);background:rgba(210,153,34,0.12)"><i class="fa-solid fa-list"></i></div>
+        <div>
+          <div class="sm-stat-label">Deals Today</div>
+          <div class="sm-stat-val" id="smTotalDeals">—</div>
+          <div class="sm-stat-sub" id="smLastRefresh">Not yet loaded</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card sm-filters-card">
+      <div class="sm-filters">
+        <div class="sm-filter-group">
+          <label>Market</label>
+          <div class="filter-pills">
+            <button class="fpill active" data-smfilter="market" data-val="all">All</button>
+            <button class="fpill" data-smfilter="market" data-val="india">🇮🇳 India</button>
+            <button class="fpill" data-smfilter="market" data-val="us">🇺🇸 US</button>
+          </div>
+        </div>
+        <div class="sm-filter-group">
+          <label>Type</label>
+          <div class="filter-pills">
+            <button class="fpill active" data-smfilter="type" data-val="all">All</button>
+            <button class="fpill" data-smfilter="type" data-val="block">Block Deal</button>
+            <button class="fpill" data-smfilter="type" data-val="bulk">Bulk Deal</button>
+            <button class="fpill" data-smfilter="type" data-val="darkpool">Dark Pool</button>
+          </div>
+        </div>
+        <div class="sm-filter-group">
+          <label>Side</label>
+          <div class="filter-pills">
+            <button class="fpill active" data-smfilter="side" data-val="all">All</button>
+            <button class="fpill" data-smfilter="side" data-val="buy">Buy Only</button>
+            <button class="fpill" data-smfilter="side" data-val="sell">Sell Only</button>
+          </div>
+        </div>
+        <div class="sm-filter-group">
+          <label id="smMinLabel">Min Value (₹ Cr)</label>
+          <div class="sm-value-input-wrap">
+            <input type="number" id="smMinValue" class="sm-value-input" placeholder="e.g. 100" min="0" oninput="renderSmartMoney()" />
+            <span class="sm-value-unit" id="smValueUnit">₹ Cr</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feed Table -->
+    <div class="card">
+      <div class="card-header">
+        <h3>Live Deal Feed</h3>
+        <span class="sm-feed-count" id="smFeedCount">—</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Symbol</th>
+              <th>Company</th>
+              <th>Type</th>
+              <th>Side</th>
+              <th>Entity / Institution</th>
+              <th>Qty</th>
+              <th>Price</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody id="smTableBody">
+            <tr><td colspan="9" class="empty-td">
+              <div class="empty-state"><i class="fa-solid fa-building-columns"></i><p>Click Refresh or navigate here to load deals</p></div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================== WATCHLIST =================== -->
+  <section class="page" id="watchlist">
+
+    <!-- ── Multi-Watchlist Manager ── -->
+    <div class="wl-manager">
+      <div class="wl-tabs-wrap">
+        <span class="wl-tabs-label"><i class="fa-solid fa-list"></i> Lists</span>
+        <div class="wl-tabs" id="wlTabs"><!-- rendered by JS --></div>
+        <button class="wl-new-btn" onclick="openWlNameModal('create')">
+          <i class="fa-solid fa-plus"></i> New List
+        </button>
+      </div>
+      <div class="wl-toolbar">
+        <div class="wl-toolbar-left">
+          <span class="wl-active-name" id="wlActiveName">My Watchlist</span>
+          <span class="wl-stock-count" id="wlActiveCount">0 stocks</span>
+        </div>
+        <div class="wl-toolbar-right">
+          <div class="wl-view-toggle">
+            <button class="wl-vtab active" id="wlViewCards" onclick="setWatchlistView('cards')"><i class="fa-solid fa-grip"></i> Cards</button>
+            <button class="wl-vtab" id="wlViewTable" onclick="setWatchlistView('table')"><i class="fa-solid fa-table-list"></i> Table</button>
+          </div>
+          <button class="btn-primary" onclick="openAddWatchModal()"><i class="fa-solid fa-plus"></i> Add Stock</button>
+          <button class="btn-outline" onclick="openWlNameModal('rename')" title="Rename this list"><i class="fa-solid fa-pen"></i> Rename</button>
+          <button class="btn-outline" onclick="duplicateWatchlist()" title="Duplicate this list"><i class="fa-regular fa-copy"></i></button>
+          <button class="btn-outline" onclick="exportWatchlistCSV()" title="Export CSV"><i class="fa-solid fa-download"></i></button>
+          <button class="btn-danger-sm" onclick="deleteActiveWatchlist()" title="Delete this list"><i class="fa-solid fa-trash"></i></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cards View -->
+    <div class="watchlist-grid" id="watchlistGrid">
+      <div class="empty-state full-empty"><i class="fa-regular fa-star"></i><p>This watchlist is empty — add stocks from any terminal</p></div>
+    </div>
+
+    <!-- Table View -->
+    <div class="card" id="watchlistTableCard" style="display:none">
+      <div class="wl-table-header">
+        <h3 id="wlTableTitle">My Watchlist</h3>
+        <span class="wl-count" id="wlTableCount">0 stocks</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Symbol</th><th>Company</th><th>Market</th><th>LTP</th>
+              <th>1D Change</th><th>1D Chg %</th><th>52W High</th><th>52W Low</th>
+              <th>Sector</th><th>P/E</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="watchlistTableBody">
+            <tr><td colspan="11" class="empty-td">
+              <div class="empty-state"><i class="fa-regular fa-star"></i><p>No stocks in this watchlist</p></div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- =================== AI CHAT SECTION =================== -->
+  <section class="page" id="ai-chat">
+    <div class="page-header">
+      <div>
+        <h2 class="page-title"><i class="fa-solid fa-robot" style="color:#a78bfa"></i> MarketPulse AI</h2>
+        <p class="page-subtitle">Powered by Gemini — ask about stocks, markets, or your portfolio</p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn-outline" onclick="clearAIChat()"><i class="fa-solid fa-trash"></i> Clear Chat</button>
+        <button class="btn-outline" id="aiChangeKeyBtn" onclick="showAIKeySetup()" style="display:none"><i class="fa-solid fa-key"></i> Change Key</button>
+      </div>
+    </div>
+
+    <div class="ai-section-wrap">
+
+      <div class="ai-key-setup" id="aiKeySetup">
+        <div class="ai-key-card">
+          <i class="fa-solid fa-key"></i>
+          <p>Enter your Gemini API key to start chatting</p>
+          <div class="ai-key-row">
+            <input type="password" id="aiApiKeyInput" class="ai-key-input" placeholder="AIzaSy…" />
+            <button class="btn-primary" onclick="saveAIKey()">Connect</button>
+          </div>
+          <span class="ai-key-hint">Stored locally in your browser only</span>
+        </div>
+      </div>
+
+      <div class="ai-chat-body" id="aiChatBody" style="display:none">
+        <div class="ai-messages" id="aiMessages">
+          <div class="ai-msg ai">
+            <div class="ai-msg-avatar"><i class="fa-solid fa-robot"></i></div>
+            <div class="ai-msg-bubble">
+              Hey! I'm your MarketPulse AI assistant. Ask me anything about stocks, your portfolio, market trends, or get a buy/sell/hold recommendation on any ticker.
+            </div>
+          </div>
+        </div>
+
+        <div class="ai-suggestions" id="aiSuggestions">
+          <button onclick="sendAISuggestion(this)">Is RELIANCE a good buy?</button>
+          <button onclick="sendAISuggestion(this)">Analyze my portfolio</button>
+          <button onclick="sendAISuggestion(this)">Best Indian stocks this week</button>
+          <button onclick="sendAISuggestion(this)">Compare TCS vs Infosys</button>
+        </div>
+
+        <div class="ai-chat-input-row">
+          <input type="text" id="aiChatInput" class="ai-chat-input"
+            placeholder="Ask about any stock…"
+            onkeydown="if(event.key==='Enter')sendAIMessage()">
+          <button class="ai-send-btn" onclick="sendAIMessage()">
+            <i class="fa-solid fa-paper-plane"></i>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<!-- =================== ADD TO PORTFOLIO MODAL =================== -->
+<div class="modal-overlay" id="addModal" onclick="closeModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <h3 id="modalTitle">Add to Portfolio</h3>
+      <button class="modal-close-btn" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="modalMarket" value="us">
+      <div class="form-grp">
+        <label>Search Stock</label>
+        <div style="position:relative">
+          <input type="text" id="fSymbol" class="form-ctrl" placeholder="Search by name or symbol…" autocomplete="off">
+          <div class="search-dropdown" id="portSearchDrop"></div>
+        </div>
+      </div>
+      <div class="form-grp">
+        <label>Company Name</label>
+        <input type="text" id="fName" class="form-ctrl" placeholder="Auto-filled on selection">
+      </div>
+      <div class="form-row-2">
+        <div class="form-grp">
+          <label>Sector</label>
+          <select id="fSector" class="form-ctrl">
+            <option>Technology</option><option>Finance</option><option>Healthcare</option>
+            <option>Energy</option><option>Consumer</option><option>Industrial</option>
+            <option>Telecom</option><option>Auto</option><option>Pharma</option>
+            <option>FMCG</option><option>Real Estate</option><option>Materials</option><option>Other</option>
+          </select>
+        </div>
+        <div class="form-grp">
+          <label>Buy Date</label>
+          <input type="date" id="fDate" class="form-ctrl">
+        </div>
+      </div>
+      <div class="form-row-2">
+        <div class="form-grp">
+          <label>Quantity</label>
+          <input type="number" id="fQty" class="form-ctrl" placeholder="10" min="0.001" step="any">
+        </div>
+        <div class="form-grp">
+          <label>Buy Price (<span id="fCurrLabel">$</span>)</label>
+          <input type="number" id="fPrice" class="form-ctrl" placeholder="150.00" min="0" step="any" oninput="updateInvestPreview()">
+        </div>
+      </div>
+      <div class="invest-preview" id="investPreview">Total Investment: <strong id="investPreviewVal">$0.00</strong></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="submitAddStock()">Add to Portfolio</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Watchlist Modal -->
+<div class="modal-overlay" id="watchModal" onclick="closeWatchModal()">
+  <div class="modal-box small-modal" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <h3>Add to Watchlist</h3>
+      <button class="modal-close-btn" onclick="closeWatchModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grp">
+        <label>Add to List</label>
+        <select id="watchTargetList" class="form-ctrl"></select>
+      </div>
+      <div class="form-grp">
+        <label>Market</label>
+        <div class="radio-row">
+          <label><input type="radio" name="watchMkt" value="us" checked> 🇺🇸 US</label>
+          <label><input type="radio" name="watchMkt" value="india"> 🇮🇳 India</label>
+        </div>
+      </div>
+      <div class="form-grp">
+        <label>Search Stock</label>
+        <div style="position:relative">
+          <input type="text" id="watchSymbolInput" class="form-ctrl" placeholder="Search by name or symbol…"
+            autocomplete="off" onkeydown="if(event.key==='Enter')submitWatchStock()">
+          <div class="search-dropdown" id="watchSearchDrop"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeWatchModal()">Cancel</button>
+      <button class="btn-primary" onclick="submitWatchStock()">Add to Watchlist</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create / Rename Watchlist Modal -->
+<!-- =================== PORTFOLIO NAME MODAL =================== -->
+<div class="modal-overlay" id="pfNameModal" onclick="closePfNameModal()">
+  <div class="modal-box small-modal" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <h3 id="pfNameModalTitle">New Portfolio</h3>
+      <button class="modal-close-btn" onclick="closePfNameModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grp">
+        <label>Portfolio Name</label>
+        <input type="text" id="pfNameInput" class="form-ctrl" placeholder="e.g. Growth Portfolio" maxlength="40"
+          onkeydown="if(event.key==='Enter')submitPfName()">
+      </div>
+      <div class="wl-name-presets">
+        <span class="wl-preset" onclick="$('pfNameInput').value='Growth Portfolio'">Growth Portfolio</span>
+        <span class="wl-preset" onclick="$('pfNameInput').value='Dividend Portfolio'">Dividend Portfolio</span>
+        <span class="wl-preset" onclick="$('pfNameInput').value='US Stocks'">US Stocks</span>
+        <span class="wl-preset" onclick="$('pfNameInput').value='India Stocks'">India Stocks</span>
+        <span class="wl-preset" onclick="$('pfNameInput').value='Long Term'">Long Term</span>
+        <span class="wl-preset" onclick="$('pfNameInput').value='Trading'">Trading</span>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closePfNameModal()">Cancel</button>
+      <button class="btn-primary" onclick="submitPfName()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="wlNameModal" onclick="closeWlNameModal()">
+  <div class="modal-box small-modal" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <h3 id="wlNameModalTitle">New Watchlist</h3>
+      <button class="modal-close-btn" onclick="closeWlNameModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grp">
+        <label>List Name</label>
+        <input type="text" id="wlNameInput" class="form-ctrl" placeholder="e.g. Tech Picks" maxlength="40"
+          onkeydown="if(event.key==='Enter')submitWlName()">
+      </div>
+      <div class="wl-name-presets">
+        <span class="wl-preset" onclick="$('wlNameInput').value='Tech Picks'">Tech Picks</span>
+        <span class="wl-preset" onclick="$('wlNameInput').value='Blue Chips'">Blue Chips</span>
+        <span class="wl-preset" onclick="$('wlNameInput').value='Growth Stocks'">Growth Stocks</span>
+        <span class="wl-preset" onclick="$('wlNameInput').value='Dividend Leaders'">Dividend Leaders</span>
+        <span class="wl-preset" onclick="$('wlNameInput').value='India Picks'">India Picks</span>
+        <span class="wl-preset" onclick="$('wlNameInput').value='F&amp;O Watchlist'">F&amp;O Watchlist</span>
+        <span class="wl-preset" onclick="$('wlNameInput').value='Short List'">Short List</span>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeWlNameModal()">Cancel</button>
+      <button class="btn-primary" onclick="submitWlName()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Move / Copy Stock Modal -->
+<div class="modal-overlay" id="moveStockModal" onclick="closeMoveModal()">
+  <div class="modal-box small-modal" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <h3>Move / Copy &nbsp;<span id="moveStockName" style="color:var(--us);font-family:'JetBrains Mono',monospace"></span></h3>
+      <button class="modal-close-btn" onclick="closeMoveModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--text3);margin-bottom:10px">Choose a destination list:</p>
+      <div class="wl-move-targets" id="moveMoveTargets"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeMoveModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"><i class="fa-solid fa-circle-check"></i><span id="toastMsg">Done</span></div>
+
+<!-- Breaking News Toast (separate from regular toast) -->
+<div class="news-toast" id="newsToast">
+  <div class="news-toast-header">
+    <span class="news-toast-label" id="newsToastLabel">🚨 BREAKING</span>
+    <button onclick="closeNewsToast()">×</button>
+  </div>
+  <div class="news-toast-body" id="newsToastBody"></div>
+  <div class="news-toast-stocks" id="newsToastStocks"></div>
+</div>
+
+<!-- News Ticker Bar -->
+<div class="news-ticker-bar" id="newsTickerBar">
+  <div class="ticker-label-wrap">
+    <span class="live-dot"></span>
+    <span class="ticker-label-text">LIVE</span>
+  </div>
+  <div class="ticker-track">
+    <div class="ticker-content" id="tickerContent">Loading market news…</div>
+  </div>
+</div>
+
+<!-- =================== ROAST MODAL =================== -->
+<div class="modal-overlay" id="roastModal" onclick="closeRoastModal()">
+  <div class="modal-box roast-modal-box" onclick="event.stopPropagation()">
+    <div class="roast-modal-header">
+      <div class="roast-title-wrap">
+        <span class="roast-fire-icon">🔥</span>
+        <div>
+          <h2 class="roast-title">Portfolio Roast</h2>
+          <p class="roast-subtitle">Powered by Gemini AI — brutally honest analysis</p>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeRoastModal()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <!-- API key prompt (shown when key not set) -->
+    <div class="roast-key-section" id="roastKeySection">
+      <div class="roast-key-card">
+        <i class="fa-solid fa-key roast-key-icon"></i>
+        <p class="roast-key-label">Enter your Google AI API key to enable Gemini analysis</p>
+        <div class="roast-key-row">
+          <input type="password" id="roastApiKey" class="roast-key-input" placeholder="AIza…" />
+          <button class="btn-primary" onclick="saveRoastKey()">Save &amp; Roast</button>
+        </div>
+        <p class="roast-key-hint">Key is stored locally in your browser — never sent anywhere except Google.</p>
+      </div>
+    </div>
+
+    <!-- Output area (shown when key is set) -->
+    <div class="roast-output-section" id="roastOutputSection" style="display:none">
+      <div class="roast-output" id="roastOutput">
+        <div class="roast-loading" id="roastLoading">
+          <div class="roast-spinner"></div>
+          <span>Gemini is analyzing your portfolio…</span>
+        </div>
+        <div class="roast-text" id="roastText"></div>
+      </div>
+      <div class="roast-footer">
+        <button class="btn-outline" onclick="clearRoastKey()"><i class="fa-solid fa-key"></i> Change API Key</button>
+        <button class="btn-roast" onclick="runRoast()"><i class="fa-solid fa-rotate-right"></i> Re-roast</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Import Portfolio Modal -->
+<div class="modal-overlay" id="importModal" onclick="closeImportModal()">
+  <div class="modal-box import-modal-box" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <h3><i class="fa-solid fa-file-excel" style="color:#1d6f42;margin-right:8px"></i>Import Portfolio from Excel / CSV</h3>
+      <button class="modal-close-btn" onclick="closeImportModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row-2">
+        <div class="form-grp">
+          <label>Import into Portfolio</label>
+          <select id="importTargetPortfolio" class="form-ctrl" onchange="toggleImportNewName()"></select>
+        </div>
+        <div class="form-grp" id="importNewNameRow" style="display:none">
+          <label>New Portfolio Name</label>
+          <input type="text" id="importNewPortfolioName" class="form-ctrl" placeholder="e.g. Imported Holdings">
+        </div>
+      </div>
+
+      <div class="import-dropzone" id="importDropzone"
+           onclick="$('importFileInput').click()"
+           ondragover="event.preventDefault();this.classList.add('dragover')"
+           ondragleave="this.classList.remove('dragover')"
+           ondrop="event.preventDefault();this.classList.remove('dragover');handleImportFile({files:event.dataTransfer.files})">
+        <input type="file" id="importFileInput" accept=".xlsx,.csv" style="display:none" onchange="handleImportFile(this)">
+        <i class="fa-solid fa-cloud-arrow-up import-dropzone-icon"></i>
+        <div class="import-dropzone-text">Click or drag &amp; drop your Excel / CSV file here</div>
+        <div class="import-dropzone-hint">Supports .xlsx and .csv &nbsp;·&nbsp; Works with Groww, Zerodha, Upstox exports &nbsp;·&nbsp; Add a <strong>"Current Price"</strong> column to set live prices directly</div>
+      </div>
+
+      <div id="importPreviewSection" style="display:none">
+        <div class="import-preview-hdr">
+          <span id="importValidCount" style="font-weight:600;font-size:13px"></span>
+          <span class="import-preview-hint">Greyed rows are skipped (missing Symbol, Qty, or Buy Price)</span>
+        </div>
+        <div class="table-wrap" style="max-height:240px;overflow-y:auto;margin-top:6px">
+          <table class="data-table">
+            <thead><tr><th>Symbol</th><th>Name</th><th>Market</th><th>Qty</th><th>Buy Price</th><th id="importLtpTh" style="display:none;color:var(--green)">Current Price</th><th>Date</th></tr></thead>
+            <tbody id="importPreviewBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeImportModal()">Cancel</button>
+      <button class="btn-outline" onclick="downloadImportTemplate()"><i class="fa-solid fa-download"></i> Template</button>
+      <button class="btn-primary" id="importConfirmBtn" style="display:none" onclick="confirmImport()"><i class="fa-solid fa-file-import"></i> Import</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://s3.tradingview.com/tv.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
