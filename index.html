@@ -1022,25 +1022,12 @@
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="btn-outline" onclick="clearAIChat()"><i class="fa-solid fa-trash"></i> Clear Chat</button>
-        <button class="btn-outline" id="aiChangeKeyBtn" onclick="showAIKeySetup()" style="display:none"><i class="fa-solid fa-key"></i> Change Key</button>
       </div>
     </div>
 
     <div class="ai-section-wrap">
 
-      <div class="ai-key-setup" id="aiKeySetup">
-        <div class="ai-key-card">
-          <i class="fa-solid fa-key"></i>
-          <p>Enter your Gemini API key to start chatting</p>
-          <div class="ai-key-row">
-            <input type="password" id="aiApiKeyInput" class="ai-key-input" placeholder="AIzaSy…" />
-            <button class="btn-primary" onclick="saveAIKey()">Connect</button>
-          </div>
-          <span class="ai-key-hint">Stored locally in your browser only</span>
-        </div>
-      </div>
-
-      <div class="ai-chat-body" id="aiChatBody" style="display:none">
+      <div class="ai-chat-body" id="aiChatBody">
         <div class="ai-messages" id="aiMessages">
           <div class="ai-msg ai">
             <div class="ai-msg-avatar"><i class="fa-solid fa-robot"></i></div>
@@ -1275,21 +1262,8 @@
       <button class="modal-close" onclick="closeRoastModal()"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
-    <!-- API key prompt (shown when key not set) -->
-    <div class="roast-key-section" id="roastKeySection">
-      <div class="roast-key-card">
-        <i class="fa-solid fa-key roast-key-icon"></i>
-        <p class="roast-key-label">Enter your Google AI API key to enable Gemini analysis</p>
-        <div class="roast-key-row">
-          <input type="password" id="roastApiKey" class="roast-key-input" placeholder="AIza…" />
-          <button class="btn-primary" onclick="saveRoastKey()">Save &amp; Roast</button>
-        </div>
-        <p class="roast-key-hint">Key is stored locally in your browser — never sent anywhere except Google.</p>
-      </div>
-    </div>
-
-    <!-- Output area (shown when key is set) -->
-    <div class="roast-output-section" id="roastOutputSection" style="display:none">
+    <!-- Output area -->
+    <div class="roast-output-section" id="roastOutputSection">
       <div class="roast-output" id="roastOutput">
         <div class="roast-loading" id="roastLoading">
           <div class="roast-spinner"></div>
@@ -1298,7 +1272,6 @@
         <div class="roast-text" id="roastText"></div>
       </div>
       <div class="roast-footer">
-        <button class="btn-outline" onclick="clearRoastKey()"><i class="fa-solid fa-key"></i> Change API Key</button>
         <button class="btn-roast" onclick="runRoast()"><i class="fa-solid fa-rotate-right"></i> Re-roast</button>
       </div>
     </div>

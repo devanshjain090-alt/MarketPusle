@@ -606,6 +606,12 @@ async function fetchTVScannerIndia(symbols) {
 // =====================================================================
 const TD_KEY  = 'd8960bfcff9f4319a7c3bca134ae4b30';
 const TD_BASE = 'https://api.twelvedata.com';
+
+// Proxy server URL — Gemini key lives here, never in the browser.
+// For local dev this hits localhost. After Railway deploy, replace the second URL.
+const PROXY_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:3001'
+  : 'https://marketpusle-production.up.railway.app';
 const TD_CACHE_KEY = () => lsKey(`sp_td_${new Date().toISOString().split('T')[0]}`);
 
 function tdCacheLoad() {
@@ -3216,34 +3222,12 @@ function confirmImport() {
 function openRoastModal() {
   if (!state.portfolio.length) { toast('Add some holdings first!', 'error'); return; }
   $('roastModal').style.display = 'flex';
-  const key = localStorage.getItem(lsKey('sp_gemini_key'));
-  if (key) {
-    $('roastKeySection').style.display = 'none';
-    $('roastOutputSection').style.display = 'flex';
-    runRoast();
-  } else {
-    $('roastKeySection').style.display = 'flex';
-    $('roastOutputSection').style.display = 'none';
-  }
-}
-
-function closeRoastModal() { $('roastModal').style.display = 'none'; }
-
-function saveRoastKey() {
-  const key = $('roastApiKey').value.trim();
-  if (!key) { toast('Please enter a valid API key', 'error'); return; }
-  localStorage.setItem(lsKey('sp_gemini_key'), key);
-  $('roastKeySection').style.display = 'none';
   $('roastOutputSection').style.display = 'flex';
   runRoast();
 }
 
-function clearRoastKey() {
-  localStorage.removeItem(lsKey('sp_gemini_key'));
-  $('roastOutputSection').style.display = 'none';
-  $('roastKeySection').style.display = 'flex';
-  $('roastApiKey').value = '';
-}
+function closeRoastModal() { $('roastModal').style.display = 'none'; }
+
 
 function buildRoastPrompt() {
   const p = state.portfolio;
@@ -3327,22 +3311,15 @@ function renderRoastMarkdown(text) {
 }
 
 async function runRoast() {
-  const key = localStorage.getItem(lsKey('sp_gemini_key'));
-  if (!key) return;
-
   const loadEl = $('roastLoading'), textEl = $('roastText');
   loadEl.style.display = 'flex';
   textEl.innerHTML = '';
 
   try {
-    const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_CHAT_MODEL + ':streamGenerateContent?alt=sse&key=' + key;
-    const body = {
-      contents: [{ role: 'user', parts: [{ text: buildRoastPrompt() }] }],
-      generationConfig: { maxOutputTokens: 8192 }
-    };
-    const resp = await _geminiPost(url, body, function(s) {
-      const el = loadEl.querySelector('span') || loadEl;
-      el.textContent = 'Rate limited — retrying in ' + s + 's…';
+    const resp = await fetch(PROXY_BASE + '/roast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: buildRoastPrompt() })
     });
 
     if (!resp.ok) {
@@ -4882,29 +4859,9 @@ if (!localStorage.getItem(lsKey('sp_ai_key'))) {
 }
 
 function initAIChat() {
-  const key = localStorage.getItem(lsKey('sp_ai_key'));
-  document.getElementById('aiKeySetup').style.display = key ? 'none' : 'flex';
-  document.getElementById('aiChatBody').style.display = key ? 'flex' : 'none';
-  const changeKeyBtn = document.getElementById('aiChangeKeyBtn');
-  if (changeKeyBtn) changeKeyBtn.style.display = key ? 'inline-flex' : 'none';
-}
-
-function showAIKeySetup() {
-  document.getElementById('aiKeySetup').style.display = 'flex';
-  document.getElementById('aiChatBody').style.display = 'none';
-  const changeKeyBtn = document.getElementById('aiChangeKeyBtn');
-  if (changeKeyBtn) changeKeyBtn.style.display = 'none';
-}
-
-function saveAIKey() {
-  const key = document.getElementById('aiApiKeyInput').value.trim();
-  if (!key.startsWith('AIzaSy')) { alert('Invalid key — must start with AIzaSy'); return; }
-  localStorage.setItem(lsKey('sp_ai_key'), key);
-  document.getElementById('aiKeySetup').style.display = 'none';
   document.getElementById('aiChatBody').style.display = 'flex';
-  const changeKeyBtn = document.getElementById('aiChangeKeyBtn');
-  if (changeKeyBtn) changeKeyBtn.style.display = 'inline-flex';
 }
+
 
 function clearAIChat() {
   aiChatMessages = [];
@@ -4936,9 +4893,6 @@ async function sendAIMessage() {
   const text = input.value.trim();
   if (!text) return;
 
-  const key = localStorage.getItem(lsKey('sp_ai_key'));
-  if (!key) { showAIKeySetup(); return; }
-
   input.value = '';
   document.getElementById('aiSuggestions').style.display = 'none';
 
@@ -4957,14 +4911,10 @@ async function sendAIMessage() {
     getPortfolioContext();
 
   try {
-    const chatUrl = 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_CHAT_MODEL + ':streamGenerateContent?alt=sse&key=' + key;
-    const chatBody = {
-      contents: aiChatMessages,
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      generationConfig: { maxOutputTokens: 4096 }
-    };
-    const response = await _geminiPost(chatUrl, chatBody, function(s) {
-      updateAIBubble(bubbleId, '⏳ Rate limited — retrying in ' + s + 's…', true);
+    const response = await fetch(PROXY_BASE + '/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: aiChatMessages, systemPrompt })
     });
 
     if (!response.ok) {
