@@ -607,11 +607,8 @@ async function fetchTVScannerIndia(symbols) {
 const TD_KEY  = 'd8960bfcff9f4319a7c3bca134ae4b30';
 const TD_BASE = 'https://api.twelvedata.com';
 
-// Proxy server URL — Gemini key lives here, never in the browser.
-// For local dev this hits localhost. After Railway deploy, replace the second URL.
-const PROXY_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? 'http://localhost:3001'
-  : 'https://marketpusle-production.up.railway.app';
+const PROXY_BASE = 'https://marketpulse-devansh.netlify.app/.netlify/functions/ai';
+
 const TD_CACHE_KEY = () => lsKey(`sp_td_${new Date().toISOString().split('T')[0]}`);
 
 function tdCacheLoad() {
@@ -3322,54 +3319,21 @@ async function runRoast() {
       body: JSON.stringify({ prompt: buildRoastPrompt() })
     });
 
+    const data = await resp.json();
+
     if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      const msg = (err.error && err.error.message) || ('HTTP ' + resp.status);
-      const hint = resp.status === 429
-        ? ' (Per-minute limit hit — wait ~1 minute then try again)'
-        : resp.status === 403 ? ' (Invalid or restricted API key)' : '';
+      const msg = (data.error && data.error.message) || ('HTTP ' + resp.status);
+      const hint = resp.status === 429 ? ' (Rate limit hit — wait ~1 minute)' : '';
       throw new Error(msg + hint);
     }
 
     loadEl.style.display = 'none';
-    let raw = '';
-    const reader = resp.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
+    textEl.innerHTML = renderRoastMarkdown(data.text || 'No response received.');
+    textEl.scrollIntoView({ behavior: 'smooth', block: 'end' });
 
-    function _processRoastLines(lines) {
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const payload = line.slice(6).trim();
-        if (!payload || payload === '[DONE]') continue;
-        try {
-          const evt = JSON.parse(payload);
-          const chunk = evt && evt.candidates && evt.candidates[0] &&
-                        evt.candidates[0].content && evt.candidates[0].content.parts &&
-                        evt.candidates[0].content.parts[0] && evt.candidates[0].content.parts[0].text;
-          if (chunk) {
-            raw += chunk;
-            textEl.innerHTML = renderRoastMarkdown(raw);
-            textEl.scrollIntoView({ behavior: 'smooth', block: 'end' });
-          }
-        } catch (e) {}
-      }
-    }
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        if (buffer.trim()) _processRoastLines(buffer.split('\n'));
-        break;
-      }
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop();
-      _processRoastLines(lines);
-    }
   } catch (e) {
     loadEl.style.display = 'none';
-    textEl.innerHTML = '<p style="color:var(--red)"><strong>Error:</strong> ' + e.message + '.<br>Check your API key or try again.</p>';
+    textEl.innerHTML = '<p style="color:var(--red)"><strong>Error:</strong> ' + e.message + '.<br>Please try again.</p>';
   }
 }
 
@@ -4917,52 +4881,18 @@ async function sendAIMessage() {
       body: JSON.stringify({ contents: aiChatMessages, systemPrompt })
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const err = await response.json().catch(function(){ return {}; });
-      const msg = (err.error && err.error.message) || ('HTTP ' + response.status);
+      const msg = (data.error && data.error.message) || ('HTTP ' + response.status);
       const hint = response.status === 429
-        ? '\n\n⏱ Per-minute limit hit — please wait ~1 minute, then try again. Your daily quota is separate and unaffected.'
-        : response.status === 403 ? '\n\n🔑 API key invalid or has restrictions. Check it in Google AI Studio.' : '';
+        ? '\n\n⏱ Rate limit hit — please wait ~1 minute, then try again.'
+        : '';
       updateAIBubble(bubbleId, '⚠️ ' + msg + hint, false);
       return;
     }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let fullText = '';
-    let buffer = '';
-
-    function _processChatLines(lines) {
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const jsonStr = line.slice(6).trim();
-        if (!jsonStr || jsonStr === '[DONE]') continue;
-        try {
-          const parsed = JSON.parse(jsonStr);
-          const chunk = parsed && parsed.candidates && parsed.candidates[0] &&
-                        parsed.candidates[0].content && parsed.candidates[0].content.parts &&
-                        parsed.candidates[0].content.parts[0] && parsed.candidates[0].content.parts[0].text;
-          if (chunk) {
-            fullText += chunk;
-            updateAIBubble(bubbleId, fullText, true);
-          }
-        } catch(e) {}
-      }
-    }
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        if (buffer.trim()) _processChatLines(buffer.split('\n'));
-        break;
-      }
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop();
-      _processChatLines(lines);
-    }
-
-    if (!fullText) fullText = 'No response received. Please try again.';
+    const fullText = data.text || 'No response received. Please try again.';
     updateAIBubble(bubbleId, fullText, false);
     aiChatMessages.push({ role: 'model', parts: [{ text: fullText }] });
 
