@@ -607,7 +607,7 @@ async function fetchTVScannerIndia(symbols) {
 const TD_KEY  = 'd8960bfcff9f4319a7c3bca134ae4b30';
 const TD_BASE = 'https://api.twelvedata.com';
 
-const PROXY_BASE = 'https://marketpulse-devansh.netlify.app/.netlify/functions/ai';
+const PROXY_BASE = 'https://prismfinance-devansh.netlify.app/.netlify/functions/ai';
 
 const TD_CACHE_KEY = () => lsKey(`sp_td_${new Date().toISOString().split('T')[0]}`);
 
