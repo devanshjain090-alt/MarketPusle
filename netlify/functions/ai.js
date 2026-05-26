@@ -1,6 +1,6 @@
 'use strict';
 
-const GEMINI_KEY   = 'AIzaSyAZ-VvgQpcaiEyZ-czMUr8qv4AZxNErl2M';
+const GEMINI_KEY   = 'AIzaSyAZmEsmL3cMJtYhGpSp0cDR0jhDd-yrNzs';
 const GEMINI_MODEL = 'gemini-2.5-flash';
 const GEMINI_BASE  = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`;
 
