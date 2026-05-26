@@ -3430,7 +3430,7 @@ const picksState = {
   // Start news engine (deferred so NEWS_DB const is initialized before access)
   setTimeout(initNewsEngine, 0);
 
-  console.log('%cMarketPulse loaded ✓', 'color:#3fb950;font-size:14px;font-weight:bold');
+  console.log('%cPrism loaded ✓', 'color:#3fb950;font-size:14px;font-weight:bold');
 })();
 
 // =====================================================================
@@ -4903,7 +4903,7 @@ async function sendAIMessage() {
   appendAIMessage('ai', '...', bubbleId);
 
   const systemPrompt =
-    'You are MarketPulse AI, an expert stock market analyst embedded in a trading terminal. ' +
+    'You are Prism AI, an expert stock market analyst embedded in a trading terminal. ' +
     'You cover both US markets (NYSE, NASDAQ) and Indian markets (NSE, BSE). ' +
     'Give sharp, concise, actionable analysis. Use bullet points where helpful. ' +
     'Always mention key risks alongside any recommendation. ' +
