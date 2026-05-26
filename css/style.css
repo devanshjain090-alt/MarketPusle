@@ -1326,6 +1326,15 @@ tr.import-row-skip td { opacity: 0.4; }
 .ai-chat-input::placeholder { color: var(--text3); }
 .ai-send-btn { width: 40px; height: 40px; border-radius: 2px; background: var(--gold); color: var(--bg); font-size: 14px; display: flex; align-items: center; justify-content: center; transition: var(--transition); flex-shrink: 0; }
 .ai-send-btn:hover { background: #dbbf7e; box-shadow: 0 0 18px rgba(200,169,110,0.3); }
+.ai-upload-btn { width: 40px; height: 40px; border-radius: 2px; background: var(--bg3); border: 1px solid var(--border); color: var(--text2); font-size: 14px; display: flex; align-items: center; justify-content: center; transition: var(--transition); flex-shrink: 0; }
+.ai-upload-btn:hover { border-color: rgba(167,139,250,0.4); color: #a78bfa; background: rgba(167,139,250,0.08); }
+.ai-upload-btn.has-image { border-color: rgba(167,139,250,0.5); color: #a78bfa; background: rgba(167,139,250,0.14); }
+.ai-image-preview { display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-top: 1px solid var(--border); background: var(--bg2); }
+.ai-preview-img { height: 52px; width: auto; max-width: 100px; border-radius: 2px; border: 1px solid var(--border); object-fit: cover; }
+.ai-preview-label { font-family: var(--mono); font-size: 11px; color: var(--text2); flex: 1; }
+.ai-preview-clear { width: 22px; height: 22px; border-radius: 50%; background: var(--bg3); border: 1px solid var(--border); color: var(--text3); font-size: 10px; display: flex; align-items: center; justify-content: center; transition: var(--transition); flex-shrink: 0; }
+.ai-preview-clear:hover { background: rgba(248,113,113,0.1); border-color: var(--red); color: var(--red); }
+.ai-msg-img { max-width: 220px; max-height: 140px; border-radius: 2px; border: 1px solid var(--border); object-fit: cover; display: block; margin-bottom: 6px; cursor: zoom-in; }
 
 /* ============================= RESPONSIVE ============================= */
 @media (max-width: 1200px) {

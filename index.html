@@ -1050,7 +1050,18 @@
           <button onclick="sendAISuggestion(this)">Compare TCS vs Infosys</button>
         </div>
 
+        <input type="file" id="aiImageInput" accept="image/*" style="display:none" onchange="handleChartImage(this)">
+
+        <div class="ai-image-preview" id="aiImagePreview" style="display:none">
+          <img class="ai-preview-img" id="aiPreviewImg" src="" alt="Chart preview">
+          <span class="ai-preview-label">Chart ready — add a question or just send to auto-analyze</span>
+          <button class="ai-preview-clear" onclick="clearChartImage()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
         <div class="ai-chat-input-row">
+          <button class="ai-upload-btn" onclick="document.getElementById('aiImageInput').click()" title="Upload chart screenshot for AI analysis">
+            <i class="fa-solid fa-image"></i>
+          </button>
           <input type="text" id="aiChatInput" class="ai-chat-input"
             placeholder="Ask about any stock…"
             onkeydown="if(event.key==='Enter')sendAIMessage()">

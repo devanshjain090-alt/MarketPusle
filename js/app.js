@@ -4829,10 +4829,54 @@ function initAIChat() {
 
 function clearAIChat() {
   aiChatMessages = [];
+  clearChartImage();
   document.getElementById('aiMessages').innerHTML =
     '<div class="ai-msg ai"><div class="ai-msg-avatar"><i class="fa-solid fa-robot"></i></div>' +
     '<div class="ai-msg-bubble">Chat cleared! Ask me anything about stocks 🚀</div></div>';
   document.getElementById('aiSuggestions').style.display = 'flex';
+}
+
+let pendingImage = null;
+
+function handleChartImage(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const dataUrl = e.target.result;
+    const [header, base64] = dataUrl.split(',');
+    const mimeType = header.match(/data:([^;]+)/)[1];
+    pendingImage = { base64, mimeType };
+    document.getElementById('aiPreviewImg').src = dataUrl;
+    document.getElementById('aiImagePreview').style.display = 'flex';
+    document.getElementById('aiChatInput').placeholder = 'Ask about this chart… (or press send to auto-analyze)';
+    const btn = document.querySelector('.ai-upload-btn');
+    if (btn) btn.classList.add('has-image');
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+function clearChartImage() {
+  pendingImage = null;
+  const preview = document.getElementById('aiImagePreview');
+  if (preview) preview.style.display = 'none';
+  const img = document.getElementById('aiPreviewImg');
+  if (img) img.src = '';
+  const inp = document.getElementById('aiChatInput');
+  if (inp) inp.placeholder = 'Ask about any stock…';
+  const btn = document.querySelector('.ai-upload-btn');
+  if (btn) btn.classList.remove('has-image');
+}
+
+function appendAIMessageWithImage(role, text, base64, mimeType) {
+  const wrap = document.getElementById('aiMessages');
+  const div = document.createElement('div');
+  div.className = 'ai-msg ' + role;
+  const imgTag = `<img class="ai-msg-img" src="data:${mimeType};base64,${base64}" alt="Chart">`;
+  div.innerHTML = `<div class="ai-msg-bubble">${imgTag}${text ? `<span>${text}</span>` : ''}</div>`;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
 }
 
 function sendAISuggestion(btn) {
@@ -4855,13 +4899,26 @@ function getPortfolioContext() {
 async function sendAIMessage() {
   const input = document.getElementById('aiChatInput');
   const text = input.value.trim();
-  if (!text) return;
+  if (!text && !pendingImage) return;
 
   input.value = '';
   document.getElementById('aiSuggestions').style.display = 'none';
 
-  appendAIMessage('user', text);
-  aiChatMessages.push({ role: 'user', parts: [{ text: text }] });
+  const imgSnap = pendingImage;
+  const parts = [];
+  if (imgSnap) {
+    parts.push({ inline_data: { mime_type: imgSnap.mimeType, data: imgSnap.base64 } });
+  }
+  const msgText = text || 'Analyze this chart. Identify the trend, key support/resistance levels, momentum signals, and give a clear Buy / Hold / Sell verdict with reasoning.';
+  parts.push({ text: msgText });
+
+  if (imgSnap) {
+    appendAIMessageWithImage('user', text, imgSnap.base64, imgSnap.mimeType);
+  } else {
+    appendAIMessage('user', text);
+  }
+  aiChatMessages.push({ role: 'user', parts });
+  clearChartImage();
 
   const bubbleId = 'ai-bubble-' + Date.now();
   appendAIMessage('ai', '...', bubbleId);
