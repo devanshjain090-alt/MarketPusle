@@ -7,7 +7,7 @@ const app     = express();
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
-const GEMINI_KEY   = process.env.GEMINI_KEY || 'AIzaSyAZmEsmL3cMJtYhGpSp0cDR0jhDd-yrNzs';
+const GEMINI_KEY   = process.env.GEMINI_KEY;
 const GEMINI_MODEL = 'gemini-2.5-flash';
 const GEMINI_BASE  = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}`;
 

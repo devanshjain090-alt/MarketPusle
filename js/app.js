@@ -4818,9 +4818,6 @@ document.addEventListener('click', function(e) {
 let aiChatMessages = []; // Gemini format: { role: 'user'|'model', parts: [{text}] }
 
 // Auto-save provided Gemini key if none stored yet
-if (!localStorage.getItem(lsKey('sp_ai_key'))) {
-  localStorage.setItem(lsKey('sp_ai_key'), 'AIzaSyAZmEsmL3cMJtYhGpSp0cDR0jhDd-yrNzs');
-}
 
 function initAIChat() {
   document.getElementById('aiChatBody').style.display = 'flex';
