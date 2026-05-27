@@ -1377,3 +1377,155 @@ tr.import-row-skip td { opacity: 0.4; }
 @media (max-width: 700px) {
   .xray-summary-row { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ============================= MOBILE MENU BUTTON ============================= */
+.mobile-menu-btn { display: none; }
+.mobile-overlay  { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.72); z-index: 195; -webkit-tap-highlight-color: transparent; }
+body.mobile-open .mobile-overlay { display: block; }
+
+/* ============================= MOBILE (≤768px) ============================= */
+@media (max-width: 768px) {
+  :root { --sidebar-w: 0px; }
+
+  /* Sidebar → slide-in overlay */
+  .sidebar {
+    width: 240px !important;
+    left: -244px;
+    z-index: 200;
+    transition: left 0.24s cubic-bezier(0.4,0,0.2,1);
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  body.mobile-open .sidebar {
+    left: 0;
+    box-shadow: 6px 0 40px rgba(0,0,0,0.9);
+  }
+
+  /* Undo rail state inside mobile overlay */
+  body.sidebar-rail { --sidebar-w: 0px; }
+  body.sidebar-rail .sidebar { width: 240px !important; overflow-y: auto; }
+  body.sidebar-rail .logo-text                         { display: block    !important; }
+  body.sidebar-rail .nav-divider                       { display: block    !important; }
+  body.sidebar-rail .nav-item > span:not(.nav-flag)    { display: inline   !important; }
+  body.sidebar-rail .nav-item > .nav-badge             { display: inline   !important; }
+  body.sidebar-rail .sidebar-clocks                    { display: flex     !important; }
+  body.sidebar-rail .sidebar-toggle-label              { display: inline   !important; }
+  body.sidebar-rail .sidebar-logo   { justify-content: flex-start !important; padding: 20px 16px !important; }
+  body.sidebar-rail .nav-item       { justify-content: flex-start !important; padding: 9px 14px !important; margin: 1px 6px !important; }
+  body.sidebar-rail .nav-item i     { width: 16px !important; font-size: 12px !important; }
+  body.sidebar-rail .nav-flag       { font-size: 14px !important; }
+
+  /* Hide the desktop collapse toggle */
+  .sidebar-toggle-btn { display: none; }
+
+  /* Hamburger */
+  .mobile-menu-btn {
+    display: flex !important;
+    align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: var(--radius-xs); color: var(--text2);
+    font-size: 14px; flex-shrink: 0; transition: var(--transition);
+  }
+  .mobile-menu-btn:hover { color: var(--gold); border-color: var(--border-hover); }
+
+  /* News ticker full-width */
+  .news-ticker-bar { left: 0; }
+
+  /* --- Topbar --- */
+  .topbar { padding: 0 10px; gap: 8px; }
+  .topbar-search-wrap { flex: 1; max-width: none; min-width: 0; }
+  .topbar-pills  { display: none; }
+  .topbar-refresh { display: none; }
+
+  /* --- Pages --- */
+  .page { padding: 12px; }
+  .terminal-layout { padding: 12px; }
+
+  /* --- Page header --- */
+  .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .page-actions { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+  .page-actions > * { flex-shrink: 0; }
+
+  /* --- Index cards --- */
+  .index-cards-row { grid-template-columns: repeat(2, 1fr); }
+
+  /* --- Dashboard grid --- */
+  .dash-grid { grid-template-columns: 1fr; }
+
+  /* --- Portfolio overview --- */
+  .port-overview-row { grid-template-columns: repeat(2, 1fr); }
+
+  /* --- Charts row --- */
+  .charts-row { grid-template-columns: 1fr; }
+
+  /* --- Terminal --- */
+  .terminal-layout { grid-template-columns: 1fr; }
+  .terminal-sidebar { display: flex; flex-direction: column; }
+  .terminal-header  { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .term-search-bar  { width: 100%; flex-wrap: wrap; }
+  .term-input       { width: 100%; }
+
+  /* --- Stock bar --- */
+  .stock-bar        { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .sbar-main        { width: 100%; min-width: 0; }
+  .sbar-actions     { margin-left: 0; width: 100%; display: flex; }
+  .sbar-actions .btn-add-port,
+  .sbar-actions .btn-watch { flex: 1; justify-content: center; font-size: 10px; }
+
+  /* --- Stats grid --- */
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+
+  /* --- Smart money --- */
+  .sm-stats-row { grid-template-columns: repeat(2, 1fr); }
+  .sm-filters   { gap: 12px; }
+
+  /* --- X-Ray --- */
+  .xray-summary-row { grid-template-columns: repeat(2, 1fr); }
+  .xray-main-grid   { grid-template-columns: 1fr; }
+
+  /* --- Picks --- */
+  .picks-grid       { grid-template-columns: 1fr; }
+  .picks-cat-row    { flex-direction: column; align-items: flex-start; }
+  .picks-cat-tabs   { flex-wrap: wrap; }
+  .picks-market-tabs { flex-wrap: wrap; }
+
+  /* --- Screener --- */
+  .screener-market-tabs { flex-wrap: wrap; }
+
+  /* --- Watchlist --- */
+  .watchlist-grid { grid-template-columns: repeat(2, 1fr); }
+  .wl-toolbar     { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .wl-toolbar-right { flex-wrap: wrap; gap: 5px; }
+
+  /* --- AI Chat --- */
+  #ai-chat { height: auto; min-height: 0; }
+  .ai-section-wrap { height: 65vh; min-height: 400px; }
+  .ai-suggestions  { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+  .ai-suggestions button { flex-shrink: 0; }
+
+  /* --- Modals --- */
+  .modal-box  { width: 96vw !important; max-width: 96vw !important; }
+  .form-row-2 { grid-template-columns: 1fr; }
+
+  /* --- Toast / news toast --- */
+  .toast      { right: 12px; bottom: 44px; max-width: calc(100vw - 24px); font-size: 10px; }
+  .news-toast { right: 12px; width: calc(100vw - 24px); max-width: none; }
+
+  /* --- Breaking banner --- */
+  .breaking-banner { padding: 8px 12px; flex-direction: column; gap: 8px; }
+  .breaking-left, .breaking-right { width: 100%; }
+}
+
+/* ============================= VERY SMALL PHONES (≤480px) ============================= */
+@media (max-width: 480px) {
+  .index-cards-row    { grid-template-columns: 1fr 1fr; }
+  .port-overview-row  { grid-template-columns: 1fr 1fr; }
+  .sm-stats-row       { grid-template-columns: 1fr 1fr; }
+  .watchlist-grid     { grid-template-columns: 1fr 1fr; }
+  .xray-summary-row   { grid-template-columns: 1fr 1fr; }
+  .page-title         { font-size: 20px; }
+  .hero-value         { font-size: 26px; }
+  .sbar-price         { font-size: 20px; }
+  .sbar-symbol        { font-size: 18px; }
+}

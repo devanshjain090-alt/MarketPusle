@@ -121,8 +121,14 @@
 <!-- ============================== MAIN ============================== -->
 <main class="main" id="main">
 
+  <!-- Mobile overlay backdrop -->
+  <div class="mobile-overlay" id="mobileOverlay"></div>
+
   <!-- Top Bar -->
   <header class="topbar">
+    <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
+      <i class="fa-solid fa-bars"></i>
+    </button>
     <div class="topbar-search-wrap">
       <i class="fa-solid fa-search search-icon"></i>
       <input type="text" id="globalSearch" class="topbar-search" placeholder="Search any stock... AAPL, RELIANCE, TSLA">
@@ -1415,6 +1421,19 @@ document.addEventListener('mousemove', function(e) {
   document.documentElement.style.setProperty('--mx', (e.clientX / window.innerWidth * 100) + '%');
   document.documentElement.style.setProperty('--my', (e.clientY / window.innerHeight * 100) + '%');
 });
+
+// Mobile sidebar
+(function() {
+  var btn = document.getElementById('mobileMenuBtn');
+  var overlay = document.getElementById('mobileOverlay');
+  function openMenu() { document.body.classList.add('mobile-open'); }
+  function closeMenu() { document.body.classList.remove('mobile-open'); }
+  btn.addEventListener('click', function() { document.body.classList.toggle('mobile-open'); });
+  overlay.addEventListener('click', closeMenu);
+  document.getElementById('sidebar').addEventListener('click', function(e) {
+    if (window.innerWidth <= 768 && e.target.closest('.nav-item')) closeMenu();
+  });
+})();
 </script>
 </body>
 </html>
