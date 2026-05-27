@@ -1415,6 +1415,19 @@ body.mobile-open .mobile-overlay { display: block; }
   body.sidebar-rail .nav-item i     { width: 16px !important; font-size: 12px !important; }
   body.sidebar-rail .nav-flag       { font-size: 14px !important; }
 
+  /* Un-hide everything the 900px breakpoint collapsed (sidebar is a full overlay on mobile) */
+  .sidebar-logo .logo-text                   { display: block  !important; }
+  .sidebar .nav-divider                      { display: block  !important; }
+  .sidebar .nav-item > span:not(.nav-flag)   { display: inline !important; }
+  .sidebar .nav-item > .nav-badge            { display: inline !important; }
+  .sidebar .sidebar-clocks                   { display: flex   !important; }
+  .sidebar .sidebar-clocks .clock-info       { display: flex   !important; }
+  .sidebar .clock-row { justify-content: flex-start !important; }
+  .sidebar .nav-item  { justify-content: flex-start !important; padding: 9px 14px !important; margin: 1px 6px !important; }
+  .sidebar .nav-item i { width: 16px !important; font-size: 12px !important; }
+  .sidebar .nav-flag   { font-size: 14px !important; }
+  .sidebar-logo        { justify-content: flex-start !important; padding: 20px 16px !important; }
+
   /* Hide the desktop collapse toggle */
   .sidebar-toggle-btn { display: none; }
 
