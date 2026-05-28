@@ -1304,6 +1304,8 @@ tr.import-row-skip td { opacity: 0.4; }
 .sm-row-sell .sm-value-cell { color: var(--red); }
 @keyframes smNewRow { 0% { background: rgba(74,222,128,0.08); } 100% { background: transparent; } }
 .sm-row-new { animation: smNewRow 3.5s ease forwards; }
+.sm-source-tag { display: inline-block; font-family: var(--mono); font-size: 10px; padding: 2px 7px; border-radius: 2px; background: rgba(139,92,246,0.1); color: #a78bfa; letter-spacing: 0.04em; text-decoration: none; white-space: nowrap; transition: var(--transition); }
+.sm-source-tag:hover { background: rgba(139,92,246,0.25); color: #c4b5fd; }
 
 /* ============================= AI CHAT ============================= */
 #ai-chat { height: calc(100vh - var(--topbar-h)); display: none; flex-direction: column; padding: 24px 28px; box-sizing: border-box; }

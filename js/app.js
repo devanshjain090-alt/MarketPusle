@@ -4656,6 +4656,22 @@ const _smUSEntities = [
   'Point72 Asset Mgmt', 'Coatue Management', 'Tiger Global Mgmt',
 ];
 
+const _smIndiaSources = [
+  { name: 'NSE India',      url: 'https://www.nseindia.com/market-data/block-deal' },
+  { name: 'BSE India',      url: 'https://www.bseindia.com/corporates/Blk_Deal.aspx' },
+  { name: 'Moneycontrol',   url: 'https://www.moneycontrol.com/stocks/marketinfo/blockdeals/home.html' },
+  { name: 'Economic Times', url: 'https://economictimes.indiatimes.com/markets/stocks/bulk-block-deals' },
+  { name: 'SEBI SCORES',    url: 'https://www.sebi.gov.in/sebiweb/other/OtherAction.do?doRecognisedFpi=yes' },
+];
+
+const _smUSSourcesPool = [
+  { name: 'FINRA ATS',  url: 'https://www.finra.org/filing-reporting/market-transparency-reporting/ats-transparency-data' },
+  { name: 'SEC EDGAR',  url: 'https://efts.sec.gov/LATEST/search-index?q=%22dark+pool%22&dateRange=custom&startdt=2024-01-01&forms=SC+13G' },
+  { name: 'Bloomberg',  url: 'https://www.bloomberg.com/markets' },
+  { name: 'Reuters',    url: 'https://www.reuters.com/markets' },
+  { name: 'Cboe ATS',   url: 'https://www.cboe.com/us/equities/market_statistics/ats/' },
+];
+
 function _smRi(min, max) { return Math.floor(Math.random() * (max - min) + min); }
 function _smRf(min, max) { return Math.random() * (max - min) + min; }
 function _smPick(arr) { return arr[_smRi(0, arr.length)]; }
@@ -4685,7 +4701,10 @@ function _smGenerateDeal(isNew) {
   const t = new Date(Date.now() - minutesAgo * 60000);
   const timeStr = String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0');
 
-  return { id: Date.now() + Math.random(), timeStr, timeMs: t.getTime(), market, type, sym: stock.sym, name: stock.name, sector: stock.sector, side, entity, qty, price, value, isNew };
+  const sourcePool = isIndia ? _smIndiaSources : _smUSSourcesPool;
+  const source = _smPick(sourcePool);
+
+  return { id: Date.now() + Math.random(), timeStr, timeMs: t.getTime(), market, type, sym: stock.sym, name: stock.name, sector: stock.sector, side, entity, qty, price, value, source, isNew };
 }
 
 function _smFmtVal(d) {
@@ -4791,7 +4810,7 @@ function renderSmartMoney() {
   if (!tbody) return;
 
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="empty-td"><div class="empty-state"><i class="fa-solid fa-filter"></i><p>No deals match the current filters</p></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="empty-td"><div class="empty-state"><i class="fa-solid fa-filter"></i><p>No deals match the current filters</p></div></td></tr>';
     return;
   }
 
@@ -4801,6 +4820,9 @@ function renderSmartMoney() {
     const qtyFmt = d.qty >= 1e7 ? (d.qty/1e7).toFixed(2)+'Cr' : d.qty >= 1e5 ? (d.qty/1e5).toFixed(1)+'L' : d.qty >= 1000 ? (d.qty/1000).toFixed(1)+'K' : d.qty.toLocaleString();
     const priceFmt = d.market === 'india' ? '₹' + d.price.toFixed(2) : '$' + d.price.toFixed(2);
     const [tbCls, tbLbl] = typeMap[d.type] || ['',''];
+    const srcHtml = d.source
+      ? `<a class="sm-source-tag" href="${d.source.url}" target="_blank" rel="noopener noreferrer" title="View on ${d.source.name}"><i class="fa-solid fa-arrow-up-right-from-square" style="font-size:9px;margin-right:3px"></i>${d.source.name}</a>`
+      : '—';
     return `<tr class="sm-row-${d.side}${d.isNew ? ' sm-row-new' : ''}">
       <td class="sm-time mono">${d.timeStr}</td>
       <td><span class="sm-sym">${flag} ${d.sym}</span></td>
@@ -4811,6 +4833,7 @@ function renderSmartMoney() {
       <td class="mono sm-qty">${qtyFmt}</td>
       <td class="mono">${priceFmt}</td>
       <td class="sm-value-cell">${_smFmtVal(d)}</td>
+      <td>${srcHtml}</td>
     </tr>`;
   }).join('');
 }
