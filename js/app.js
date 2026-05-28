@@ -3527,8 +3527,19 @@ function scoreStock(s, isIndia) {
 }
 
 function computeAllPicks(db, isIndia) {
+  const dateStr = new Date().toISOString().split('T')[0];
   return db
-    .map(s => ({ ...s, score: scoreStock(s, isIndia) }))
+    .map(s => {
+      const score = scoreStock(s, isIndia);
+      // Small date+symbol hash so close-scored stocks rotate daily while quality leaders stay near top
+      let h = 0;
+      for (let i = 0; i < s.symbol.length + dateStr.length; i++) {
+        const c = i < s.symbol.length ? s.symbol.charCodeAt(i) : dateStr.charCodeAt(i - s.symbol.length);
+        h = Math.imul(h ^ c, 0x5bd1e995) | 0;
+      }
+      score.total = Math.min(100, Math.max(0, score.total + ((h & 0xFF) / 255 * 8) - 4));
+      return { ...s, score };
+    })
     .sort((a, b) => b.score.total - a.score.total);
 }
 
