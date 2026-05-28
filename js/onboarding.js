@@ -96,8 +96,16 @@
   };
 
   // ── init ──────────────────────────────────────────────────────────────────
+  function hideTourBtn() {
+    var btn = document.querySelector('.ud-tour');
+    if (btn) btn.style.display = 'none';
+    // Also hide the divider above it
+    var prev = btn && btn.previousElementSibling;
+    if (prev && prev.classList.contains('ud-divider')) prev.style.display = 'none';
+  }
+
   function init() {
-    if (!isNew()) return;
+    if (!isNew()) { hideTourBtn(); return; }
     setTimeout(window.startOnboardingTour, 900);
   }
 
@@ -253,6 +261,7 @@
 
   function end() {
     markDone();
+    hideTourBtn();
     resetSidebar();
     overlay.classList.remove('ob-active');
     var o = overlay;
