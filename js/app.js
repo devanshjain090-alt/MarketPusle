@@ -4659,17 +4659,17 @@ const _smUSEntities = [
 const _smIndiaSources = [
   { name: 'NSE India',      url: 'https://www.nseindia.com/market-data/block-deal' },
   { name: 'BSE India',      url: 'https://www.bseindia.com/corporates/Blk_Deal.aspx' },
-  { name: 'Moneycontrol',   url: 'https://www.moneycontrol.com/stocks/marketinfo/blockdeals/home.html' },
-  { name: 'Economic Times', url: 'https://economictimes.indiatimes.com/markets/stocks/bulk-block-deals' },
-  { name: 'SEBI SCORES',    url: 'https://www.sebi.gov.in/sebiweb/other/OtherAction.do?doRecognisedFpi=yes' },
+  { name: 'Moneycontrol',   url: 'https://www.moneycontrol.com' },
+  { name: 'Economic Times', url: 'https://economictimes.indiatimes.com/markets' },
+  { name: 'SEBI',           url: 'https://www.sebi.gov.in' },
 ];
 
 const _smUSSourcesPool = [
-  { name: 'FINRA ATS',  url: 'https://www.finra.org/filing-reporting/market-transparency-reporting/ats-transparency-data' },
-  { name: 'SEC EDGAR',  url: 'https://efts.sec.gov/LATEST/search-index?q=%22dark+pool%22&dateRange=custom&startdt=2024-01-01&forms=SC+13G' },
+  { name: 'FINRA',      url: 'https://www.finra.org' },
+  { name: 'SEC.gov',    url: 'https://www.sec.gov' },
   { name: 'Bloomberg',  url: 'https://www.bloomberg.com/markets' },
   { name: 'Reuters',    url: 'https://www.reuters.com/markets' },
-  { name: 'Cboe ATS',   url: 'https://www.cboe.com/us/equities/market_statistics/ats/' },
+  { name: 'Cboe',       url: 'https://www.cboe.com' },
 ];
 
 function _smRi(min, max) { return Math.floor(Math.random() * (max - min) + min); }
