@@ -37,7 +37,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ reply: m, roast: m, text: m });
     }
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_KEY}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_KEY}`;
 
     const geminiResponse = await fetch(geminiUrl, {
       method: 'POST',
