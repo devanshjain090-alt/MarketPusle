@@ -8,8 +8,7 @@ export default async function handler(req, res) {
 
   try {
     if (!process.env.GEMINI_KEY) {
-      console.error('GEMINI_KEY environment variable is missing');
-      return res.status(500).json({ error: 'Server configuration error: API key not set' });
+      return res.status(200).json({ reply: 'Server error: GEMINI_KEY not configured', roast: 'Server error: GEMINI_KEY not configured' });
     }
 
     const body = req.body;
@@ -17,29 +16,26 @@ export default async function handler(req, res) {
     const userText = isRoast ? body.prompt : body.message;
 
     if (!userText) {
-      return res.status(400).json({ error: 'Missing prompt or message in request body' });
+      return res.status(200).json({ reply: 'No message provided', roast: 'No message provided' });
     }
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_KEY}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_KEY}`;
 
     const geminiResponse = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: userText }] }]
+        contents: [{ parts: [{ text: userText }] }]
       })
     });
 
     const data = await geminiResponse.json();
 
-    // Log the Gemini response for debugging
-    console.log('Gemini response status:', geminiResponse.status);
-    console.log('Gemini response:', JSON.stringify(data).slice(0, 500));
-
     if (!geminiResponse.ok) {
+      const errMsg = data.error?.message || JSON.stringify(data).slice(0, 300);
       return res.status(200).json({
-        reply: `Gemini API error: ${data.error?.message || 'Unknown'}`,
-        roast: `Gemini API error: ${data.error?.message || 'Unknown'}`
+        reply: `Error from Gemini (${geminiResponse.status}): ${errMsg}`,
+        roast: `Error from Gemini (${geminiResponse.status}): ${errMsg}`
       });
     }
 
@@ -47,15 +43,17 @@ export default async function handler(req, res) {
 
     if (!text) {
       return res.status(200).json({
-        reply: 'No response generated. Raw response: ' + JSON.stringify(data).slice(0, 200),
-        roast: 'No response generated'
+        reply: 'Empty response. Raw: ' + JSON.stringify(data).slice(0, 300),
+        roast: 'Empty response. Raw: ' + JSON.stringify(data).slice(0, 300)
       });
     }
 
     return res.status(200).json({ reply: text, roast: text });
 
   } catch (e) {
-    console.error('Function error:', e.message, e.stack);
-    return res.status(500).json({ error: e.message });
+    return res.status(200).json({
+      reply: 'Function crashed: ' + e.message,
+      roast: 'Function crashed: ' + e.message
+    });
   }
 }
