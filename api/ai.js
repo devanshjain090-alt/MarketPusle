@@ -14,10 +14,10 @@ export default async function handler(req, res) {
 
     const body = req.body;
     const isRoast = req.url.includes('roast');
-    const userText = isRoast ? body.prompt : (body.message || body.prompt);
+    const userText = body.message || body.prompt || body.text || body.query || body.input || body.content || (typeof body === 'string' ? body : null);
 
     if (!userText) {
-      const m = 'No message provided';
+      const m = 'No message found. Received body: ' + JSON.stringify(body).slice(0, 300);
       return res.status(200).json({ reply: m, roast: m, text: m, response: m, message: m });
     }
 
