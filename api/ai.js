@@ -8,15 +8,17 @@ export default async function handler(req, res) {
 
   try {
     if (!process.env.GEMINI_KEY) {
-      return res.status(200).json({ reply: 'Server error: GEMINI_KEY not configured', roast: 'Server error: GEMINI_KEY not configured' });
+      const m = 'Server error: GEMINI_KEY not configured';
+      return res.status(200).json({ reply: m, roast: m, text: m, response: m, message: m });
     }
 
     const body = req.body;
     const isRoast = req.url.includes('roast');
-    const userText = isRoast ? body.prompt : body.message;
+    const userText = isRoast ? body.prompt : (body.message || body.prompt);
 
     if (!userText) {
-      return res.status(200).json({ reply: 'No message provided', roast: 'No message provided' });
+      const m = 'No message provided';
+      return res.status(200).json({ reply: m, roast: m, text: m, response: m, message: m });
     }
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_KEY}`;
@@ -32,28 +34,21 @@ export default async function handler(req, res) {
     const data = await geminiResponse.json();
 
     if (!geminiResponse.ok) {
-      const errMsg = data.error?.message || JSON.stringify(data).slice(0, 300);
-      return res.status(200).json({
-        reply: `Error from Gemini (${geminiResponse.status}): ${errMsg}`,
-        roast: `Error from Gemini (${geminiResponse.status}): ${errMsg}`
-      });
+      const errMsg = `Gemini error (${geminiResponse.status}): ${data.error?.message || JSON.stringify(data).slice(0, 200)}`;
+      return res.status(200).json({ reply: errMsg, roast: errMsg, text: errMsg, response: errMsg, message: errMsg });
     }
 
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!text) {
-      return res.status(200).json({
-        reply: 'Empty response. Raw: ' + JSON.stringify(data).slice(0, 300),
-        roast: 'Empty response. Raw: ' + JSON.stringify(data).slice(0, 300)
-      });
+      const raw = 'No text in response. Raw: ' + JSON.stringify(data).slice(0, 400);
+      return res.status(200).json({ reply: raw, roast: raw, text: raw, response: raw, message: raw });
     }
 
-    return res.status(200).json({ reply: text, roast: text });
+    return res.status(200).json({ reply: text, roast: text, text: text, response: text, message: text });
 
   } catch (e) {
-    return res.status(200).json({
-      reply: 'Function crashed: ' + e.message,
-      roast: 'Function crashed: ' + e.message
-    });
+    const errMsg = 'Function crashed: ' + e.message;
+    return res.status(200).json({ reply: errMsg, roast: errMsg, text: errMsg, response: errMsg, message: errMsg });
   }
 }
