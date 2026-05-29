@@ -4963,7 +4963,7 @@ async function sendAIMessage() {
     getPortfolioContext();
 
   try {
-    const response = await fetch(PROXY_BASE + '/chat', {
+    const response = await fetch(PROXY_BASE, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: aiChatMessages, systemPrompt })

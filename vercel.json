@@ -1,0 +1,6 @@
+{
+  "outputDirectory": ".",
+  "rewrites": [
+    { "source": "/api/ai/:path*", "destination": "/api/ai" }
+  ]
+}
