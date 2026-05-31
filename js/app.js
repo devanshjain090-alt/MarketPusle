@@ -1655,6 +1655,7 @@ async function fetchLivePrices() {
     const hasIndian = state.portfolio.some(h => h.market === 'india');
     let bhavcopy = null;
     let bhavDate = null;
+    let nameIndex = {};
 
     if (hasIndian) {
       try {
@@ -1663,6 +1664,7 @@ async function fetchLivePrices() {
         if (data.success) {
           bhavcopy = data.prices;
           bhavDate = data.date;
+          nameIndex = data.nameIndex || {};
         } else {
           toast(data.error || 'Could not fetch Indian prices', 'error');
         }
@@ -1704,72 +1706,49 @@ async function fetchLivePrices() {
     const indiaHoldings = state.portfolio.filter(h => h.market === 'india');
     if (indiaHoldings.length) {
       if (bhavcopy) {
+        const STOP = new Set(['LIMITED','LTD','PRIVATE','PVT','INDUSTRIES','INDUSTRY',
+          'TECHNOLOGIES','TECHNOLOGY','CORP','CORPORATION','ENTERPRISES','ENTERPRISE',
+          'SOLUTIONS','SERVICES','SERVICE','GROUP','INDIA','INDIAN','AND','OF','THE']);
+
         for (const h of indiaHoldings) {
           const normalizedSymbol = h.symbol
             .toUpperCase()
             .replace(/\s+/g, '')
-            .replace(/\.NS$/, '')
-            .replace(/\.BO$/, '')
-            .replace(/^NSE:/, '')
-            .replace(/^BSE:/, '');
+            .replace(/\.NS$|\.BO$/g, '')
+            .replace(/^NSE:|^BSE:/g, '');
 
+          // 1. Direct symbol match
           let p = bhavcopy[normalizedSymbol];
 
-          if (!p) {
-            // 1. Static alias map
-            const aliases = {
-              'L&T': 'LT', 'LT': 'LT', 'LARSEN': 'LT',
-              'M&M': 'M&M', 'MAHINDRA': 'M&M',
-              'TATAMOTOR': 'TATAMOTORS',
-              'HUL': 'HINDUNILVR', 'HINDUNILVR': 'HINDUNILVR',
-              'HDFC': 'HDFCBANK',
-              'BAJAJ-AUTO': 'BAJAJ-AUTO', 'BAJAJAUTO': 'BAJAJ-AUTO',
-              'VEDANTA': 'VEDL',
-              'JAYASWAL': 'JAYNECOIND',
-              'RAILWAY': 'RAILTEL',
-              'JAIPRAKASH': 'JAIPURKURT',
-              'MAXIMUS': 'MAXIND',
-              'NIPPON': 'NIPPOBATRY',
-              'NMDCSTEEL': 'NMDC',
-              'SBIBALANCE': 'SBIBPB',
-              'STEELEXCHA': 'STEELXIND',
-              'URJAGLOBAL': 'URJA',
-              'AWLAGRIBUS': 'AWL',
-              'GEMSTONE': 'GEMAROMA',
-              'CHDCHEMICA': 'CHDCHEM',
-              'EKIENERGY': 'EKI',
-              'FUTURE': 'FEL',
-              'SPACENET': 'SPCENET',
-              'VISAGAR': 'VIVIDHA',
-              'VISESH': 'VISESHINFO',
-              'JOHNSON': 'JCHAC',
-            };
-            if (aliases[normalizedSymbol]) p = bhavcopy[aliases[normalizedSymbol]];
-          }
+          // 2. Company name match via nameIndex
+          if (!p && h.name) {
+            const normalizedName = h.name.toUpperCase()
+              .replace(/[^A-Z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
 
-          if (!p) {
-            // 2. Fuzzy match — find best bhavcopy key for this symbol
-            const bhavKeys = Object.keys(bhavcopy);
-            const sym = normalizedSymbol;
+            // Exact name match
+            if (nameIndex[normalizedName]) {
+              p = bhavcopy[nameIndex[normalizedName]];
+            }
 
-            const subMatches = bhavKeys.filter(k => k.includes(sym) || sym.includes(k));
+            // Word-overlap match
+            if (!p) {
+              const holdingWords = normalizedName.split(' ')
+                .filter(w => w.length >= 2 && !STOP.has(w));
 
-            if (subMatches.length === 1) {
-              p = bhavcopy[subMatches[0]];
-              console.log(`[AutoAlias] ${sym} → ${subMatches[0]}`);
-            } else if (subMatches.length > 1) {
-              const best = subMatches.reduce((a, b) =>
-                Math.abs(a.length - sym.length) <= Math.abs(b.length - sym.length) ? a : b
-              );
-              p = bhavcopy[best];
-              console.log(`[AutoAlias] ${sym} → ${best} (from ${subMatches.length} candidates: ${subMatches.join(', ')})`);
-            } else {
-              // 3. Prefix fallback — only when exactly one key matches (safe single-candidate)
-              const prefix = sym.slice(0, 5);
-              const prefixMatches = bhavKeys.filter(k => k.startsWith(prefix));
-              if (prefixMatches.length === 1) {
-                p = bhavcopy[prefixMatches[0]];
-                console.log(`[PrefixAlias] ${sym} → ${prefixMatches[0]}`);
+              if (holdingWords.length >= 1) {
+                let bestSymbol = null, bestScore = 0;
+                for (const [indexedName, sym] of Object.entries(nameIndex)) {
+                  const matches = holdingWords.filter(w => indexedName.includes(w)).length;
+                  const score = matches / holdingWords.length;
+                  if (score > bestScore && score >= 0.5) {
+                    bestScore = score;
+                    bestSymbol = sym;
+                  }
+                }
+                if (bestSymbol) {
+                  p = bhavcopy[bestSymbol];
+                  console.log(`[NameMatch] ${h.name} → ${bestSymbol} (score=${bestScore.toFixed(2)})`);
+                }
               }
             }
           }
@@ -1780,6 +1759,7 @@ async function fetchLivePrices() {
             updated++;
           } else {
             failed.push(h.symbol);
+            console.log(`[NotFound] ${h.symbol} (${h.name})`);
           }
         }
       } else {

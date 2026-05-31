@@ -10,12 +10,10 @@ export default async function handler(req, res) {
     const ist = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
     const istHourDecimal = ist.getUTCHours() + (ist.getUTCMinutes() / 60);
 
-    // If before 6 PM IST, use previous trading day
     if (istHourDecimal < 12.5) {
       ist.setDate(ist.getDate() - 1);
     }
 
-    // Try up to 5 days back to skip weekends and holidays
     let csv = null;
     let usedDate = null;
 
@@ -56,6 +54,8 @@ export default async function handler(req, res) {
 
     const lines = csv.split('\n');
     const prices = {};
+    // nameIndex: normalized company name → NSE symbol
+    const nameIndex = {};
 
     for (let i = 1; i < lines.length; i++) {
       const cols = lines[i].split(',').map(c => c.trim());
@@ -63,6 +63,7 @@ export default async function handler(req, res) {
 
       const symbol = cols[0];
       const series = cols[1];
+      const companyName = cols[2] || '';
 
       if (!['EQ', 'BE', 'BZ', 'BL', 'IL', 'SM', 'ST', 'T0', 'T1'].includes(series)) continue;
 
@@ -75,12 +76,19 @@ export default async function handler(req, res) {
         open: parseFloat(cols[4]),
         high: parseFloat(cols[5]),
         low: parseFloat(cols[6]),
-        close: close,
-        prevClose: prevClose,
+        close,
+        prevClose,
         change: close - prevClose,
         changePct: ((close - prevClose) / prevClose) * 100,
-        volume: parseInt(cols[10]) || 0
+        volume: parseInt(cols[10]) || 0,
+        name: companyName
       };
+
+      if (companyName) {
+        const normalized = companyName.toUpperCase()
+          .replace(/[^A-Z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+        nameIndex[normalized] = symbol;
+      }
     }
 
     res.setHeader('Cache-Control', 's-maxage=43200, stale-while-revalidate');
@@ -89,7 +97,8 @@ export default async function handler(req, res) {
       success: true,
       date: usedDate,
       count: Object.keys(prices).length,
-      prices: prices
+      prices,
+      nameIndex
     });
 
   } catch (e) {
