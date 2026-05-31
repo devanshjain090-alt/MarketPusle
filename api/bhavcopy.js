@@ -64,7 +64,7 @@ export default async function handler(req, res) {
       const symbol = cols[0];
       const series = cols[1];
 
-      if (series !== 'EQ' && series !== 'BE') continue;
+      if (!['EQ', 'BE', 'BZ', 'BL', 'IL', 'SM', 'ST', 'T0', 'T1'].includes(series)) continue;
 
       const close = parseFloat(cols[7]);
       const prevClose = parseFloat(cols[8]);

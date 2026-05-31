@@ -1705,7 +1705,36 @@ async function fetchLivePrices() {
     if (indiaHoldings.length) {
       if (bhavcopy) {
         for (const h of indiaHoldings) {
-          const p = bhavcopy[h.symbol.toUpperCase()];
+          const normalizedSymbol = h.symbol
+            .toUpperCase()
+            .replace(/\s+/g, '')
+            .replace(/\.NS$/, '')
+            .replace(/\.BO$/, '')
+            .replace(/^NSE:/, '')
+            .replace(/^BSE:/, '');
+
+          let p = bhavcopy[normalizedSymbol];
+
+          if (!p) {
+            const aliases = {
+              'L&T': 'LT', 'LT': 'LT', 'LARSEN': 'LT',
+              'M&M': 'M&M', 'MAHINDRA': 'M&M',
+              'TATAMOTOR': 'TATAMOTORS', 'TATAMOTORS': 'TATAMOTORS',
+              'HDFCBANK': 'HDFCBANK', 'HDFC': 'HDFCBANK',
+              'ICICIBANK': 'ICICIBANK',
+              'HUL': 'HINDUNILVR', 'HINDUNILVR': 'HINDUNILVR',
+              'KOTAKBANK': 'KOTAKBANK',
+              'BAJAJ-AUTO': 'BAJAJ-AUTO', 'BAJAJAUTO': 'BAJAJ-AUTO', 'BAJAJ AUTO': 'BAJAJ-AUTO'
+            };
+            if (aliases[normalizedSymbol]) p = bhavcopy[aliases[normalizedSymbol]];
+          }
+
+          if (!p) {
+            const prefix = normalizedSymbol.slice(0, 6);
+            const match = Object.keys(bhavcopy).find(k => k.startsWith(prefix));
+            if (match) p = bhavcopy[match];
+          }
+
           if (p) {
             h.currentPrice = p.close;
             patchIndiaDB(h.symbol, p.close, p.change, p.changePct);
@@ -1717,6 +1746,17 @@ async function fetchLivePrices() {
       } else {
         indiaHoldings.forEach(h => failed.push(h.symbol));
       }
+    }
+
+    if (failed.length && bhavcopy) {
+      console.log('Failed symbols:', failed);
+      console.log('Bhavcopy has these similar keys:', failed.map(s => {
+        const prefix = s.slice(0, 4).toUpperCase();
+        return {
+          yours: s,
+          similar: Object.keys(bhavcopy).filter(k => k.startsWith(prefix)).slice(0, 5)
+        };
+      }));
     }
 
     savePortfolio();
@@ -3092,7 +3132,11 @@ function handleImportFile(input) {
       // Symbol resolution
       let symbol = '', name = rawCompanyName, sector = '', symbolGuessed = false;
       if (hasSymbolCol) {
-        symbol = get(r, 'symbol', 'ticker', 'scrip').toUpperCase();
+        symbol = get(r, 'symbol', 'ticker', 'scrip')
+          .toUpperCase()
+          .replace(/\s+/g, '')
+          .replace(/^(NSE:|BSE:)/, '')
+          .replace(/\.(NS|BO)$/, '');
       } else if (rawCompanyName) {
         const resolved = guessIndiaSymbol(rawCompanyName);
         symbol  = resolved.symbol;
@@ -5050,7 +5094,12 @@ function getIndianMarketState() {
   const decimalHour = ist.getUTCHours() + (ist.getUTCMinutes() / 60);
 
   if (day === 0 || day === 6) {
-    return { state: 'weekend', message: 'NSE closed for weekend. Showing last available prices.', canUpdate: true };
+    const dayName = day === 0 ? 'Sunday' : 'Saturday';
+    return {
+      state: 'weekend',
+      message: `<strong>NSE closed (${dayName}).</strong> Click Live Prices to fetch the last trading day's (Friday) closing values.`,
+      canUpdate: true
+    };
   }
   if (decimalHour >= 3.75 && decimalHour < 10) {
     return { state: 'open', message: 'Market open (9:15 AM – 3:30 PM IST). Indian prices will update after close, post 6 PM IST.', canUpdate: false };
