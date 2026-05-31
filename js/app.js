@@ -1681,54 +1681,75 @@ async function fetchLivePrices() {
       }
     }
 
-    // ── India: Google Finance → Yahoo Finance fallback ───────────────────
+    // ── India: Gemini AI with Google Search ──────────────────────────────
     const indiaHoldings = state.portfolio.filter(h => h.market === 'india');
     if (indiaHoldings.length) {
-      for (let i = 0; i < indiaHoldings.length; i++) {
-        const h = indiaHoldings[i];
-        if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${i + 1}/${indiaHoldings.length} ${h.symbol}…`;
+      if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Asking Gemini…';
+
+      const key = _geminiKey();
+      if (!key) {
+        toast('Set your Gemini API key in AI Chat to fetch Indian prices', 'error');
+        indiaHoldings.forEach(h => failed.push(h.symbol));
+      } else {
+        const stockList = indiaHoldings.map(h => `${h.symbol} (${h.name})`).join(', ');
+
+        const prompt = `Search Google right now and find the latest NSE closing prices for these Indian stocks: ${stockList}.
+
+Return ONLY a raw JSON object like this, no markdown, no explanation:
+{"RELIANCE": 1321.9, "TCS": 2256.0, "TATAMOTORS": 652.3}
+
+Use the stock symbol as the key. If a stock is not found on NSE, skip it. Search each one on Google Finance or NSE India.`;
 
         try {
-          const googleUrl = `https://www.google.com/finance/quote/${encodeURIComponent(h.symbol)}:NSE`;
-          const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(googleUrl)}`;
-
-          const r = await fetch(proxyUrl);
-          const data = await r.json();
-          const html = data.contents || '';
-
-          const match = html.match(/data-last-price="([\d.]+)"/);
-          const prevMatch = html.match(/data-prev-close="([\d.]+)"/);
-
-          if (match && match[1]) {
-            const price = parseFloat(match[1]);
-            const prev = prevMatch ? parseFloat(prevMatch[1]) : price;
-            const change = price - prev;
-            const changePct = prev > 0 ? (change / prev) * 100 : 0;
-            h.currentPrice = price;
-            patchIndiaDB(h.symbol, price, change, changePct);
-            updated++;
-          } else {
-            // Fallback: Yahoo Finance
-            const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(h.symbol)}.NS?interval=1d&range=1d`;
-            const yahooProxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`;
-            const yr = await fetch(yahooProxy);
-            const ydata = await yr.json();
-            const meta = ydata?.chart?.result?.[0]?.meta;
-            const yprice = meta?.regularMarketPrice;
-            if (yprice > 0) {
-              const yprev = meta.previousClose || meta.chartPreviousClose || yprice;
-              h.currentPrice = yprice;
-              patchIndiaDB(h.symbol, yprice, yprice - yprev, ((yprice - yprev) / yprev) * 100);
-              updated++;
-            } else {
-              failed.push(h.symbol);
+          const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                tools: [{ googleSearch: {} }],
+                generationConfig: { temperature: 0, maxOutputTokens: 2000 }
+              })
             }
-          }
-        } catch {
-          failed.push(h.symbol);
-        }
+          );
 
-        await new Promise(r => setTimeout(r, 300));
+          if (res.ok) {
+            const data = await res.json();
+            const text = (data.candidates?.[0]?.content?.parts || [])
+              .map(p => p.text || '').join('');
+            const match = text.match(/\{[\s\S]*\}/);
+
+            if (match) {
+              const prices = JSON.parse(match[0]);
+              indiaHoldings.forEach(h => {
+                const sym = h.symbol.toUpperCase()
+                  .replace(/\.NS$|\.BO$/g, '')
+                  .replace(/^NSE:|^BSE:/g, '');
+                const price = prices[sym] || prices[h.symbol];
+                if (price > 0) {
+                  const prev = h.currentPrice || h.buyPrice;
+                  const change = price - prev;
+                  const changePct = prev > 0 ? (change / prev) * 100 : 0;
+                  h.currentPrice = price;
+                  patchIndiaDB(h.symbol, price, change, changePct);
+                  updated++;
+                } else {
+                  failed.push(h.symbol);
+                }
+              });
+            } else {
+              indiaHoldings.forEach(h => failed.push(h.symbol));
+              toast('Gemini returned unexpected format', 'error');
+            }
+          } else {
+            indiaHoldings.forEach(h => failed.push(h.symbol));
+            toast('Gemini request failed', 'error');
+          }
+        } catch(e) {
+          indiaHoldings.forEach(h => failed.push(h.symbol));
+          toast('Gemini error: ' + e.message, 'error');
+        }
       }
     }
 
