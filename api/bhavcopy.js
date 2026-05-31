@@ -54,8 +54,6 @@ export default async function handler(req, res) {
 
     const lines = csv.split('\n');
     const prices = {};
-    // nameIndex: normalized company name → NSE symbol
-    const nameIndex = {};
 
     for (let i = 1; i < lines.length; i++) {
       const cols = lines[i].split(',').map(c => c.trim());
@@ -63,7 +61,6 @@ export default async function handler(req, res) {
 
       const symbol = cols[0];
       const series = cols[1];
-      const companyName = cols[2] || '';
 
       if (!['EQ', 'BE', 'BZ', 'BL', 'IL', 'SM', 'ST', 'T0', 'T1'].includes(series)) continue;
 
@@ -80,15 +77,8 @@ export default async function handler(req, res) {
         prevClose,
         change: close - prevClose,
         changePct: ((close - prevClose) / prevClose) * 100,
-        volume: parseInt(cols[10]) || 0,
-        name: companyName
+        volume: parseInt(cols[10]) || 0
       };
-
-      if (companyName) {
-        const normalized = companyName.toUpperCase()
-          .replace(/[^A-Z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
-        nameIndex[normalized] = symbol;
-      }
     }
 
     res.setHeader('Cache-Control', 's-maxage=43200, stale-while-revalidate');
@@ -97,8 +87,7 @@ export default async function handler(req, res) {
       success: true,
       date: usedDate,
       count: Object.keys(prices).length,
-      prices,
-      nameIndex
+      prices
     });
 
   } catch (e) {

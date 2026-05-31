@@ -1652,27 +1652,6 @@ async function fetchLivePrices() {
   }
 
   try {
-    const hasIndian = state.portfolio.some(h => h.market === 'india');
-    let bhavcopy = null;
-    let bhavDate = null;
-    let nameIndex = {};
-
-    if (hasIndian) {
-      try {
-        const r = await fetch(`${PROXY_BASE.replace('/ai', '')}/bhavcopy`);
-        const data = await r.json();
-        if (data.success) {
-          bhavcopy = data.prices;
-          bhavDate = data.date;
-          nameIndex = data.nameIndex || {};
-        } else {
-          toast(data.error || 'Could not fetch Indian prices', 'error');
-        }
-      } catch (e) {
-        toast('Bhavcopy fetch failed: ' + e.message, 'error');
-      }
-    }
-
     let updated = 0;
     const failed = [];
 
@@ -1702,78 +1681,55 @@ async function fetchLivePrices() {
       }
     }
 
-    // ── India: NSE Bhavcopy (EOD) ─────────────────────────────────────────
+    // ── India: Google Finance → Yahoo Finance fallback ───────────────────
     const indiaHoldings = state.portfolio.filter(h => h.market === 'india');
     if (indiaHoldings.length) {
-      if (bhavcopy) {
-        const STOP = new Set(['LIMITED','LTD','PRIVATE','PVT','INDUSTRIES','INDUSTRY',
-          'TECHNOLOGIES','TECHNOLOGY','CORP','CORPORATION','ENTERPRISES','ENTERPRISE',
-          'SOLUTIONS','SERVICES','SERVICE','GROUP','INDIA','INDIAN','AND','OF','THE']);
+      for (let i = 0; i < indiaHoldings.length; i++) {
+        const h = indiaHoldings[i];
+        if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${i + 1}/${indiaHoldings.length} ${h.symbol}…`;
 
-        for (const h of indiaHoldings) {
-          const normalizedSymbol = h.symbol
-            .toUpperCase()
-            .replace(/\s+/g, '')
-            .replace(/\.NS$|\.BO$/g, '')
-            .replace(/^NSE:|^BSE:/g, '');
+        try {
+          const googleUrl = `https://www.google.com/finance/quote/${encodeURIComponent(h.symbol)}:NSE`;
+          const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(googleUrl)}`;
 
-          // 1. Direct symbol match
-          let p = bhavcopy[normalizedSymbol];
+          const r = await fetch(proxyUrl);
+          const data = await r.json();
+          const html = data.contents || '';
 
-          // 2. Company name match via nameIndex
-          if (!p && h.name) {
-            const normalizedName = h.name.toUpperCase()
-              .replace(/[^A-Z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+          const match = html.match(/data-last-price="([\d.]+)"/);
+          const prevMatch = html.match(/data-prev-close="([\d.]+)"/);
 
-            // Exact name match
-            if (nameIndex[normalizedName]) {
-              p = bhavcopy[nameIndex[normalizedName]];
-            }
-
-            // Word-overlap match
-            if (!p) {
-              const holdingWords = normalizedName.split(' ')
-                .filter(w => w.length >= 2 && !STOP.has(w));
-
-              if (holdingWords.length >= 1) {
-                let bestSymbol = null, bestScore = 0;
-                for (const [indexedName, sym] of Object.entries(nameIndex)) {
-                  const matches = holdingWords.filter(w => indexedName.includes(w)).length;
-                  const score = matches / holdingWords.length;
-                  if (score > bestScore && score >= 0.5) {
-                    bestScore = score;
-                    bestSymbol = sym;
-                  }
-                }
-                if (bestSymbol) {
-                  p = bhavcopy[bestSymbol];
-                  console.log(`[NameMatch] ${h.name} → ${bestSymbol} (score=${bestScore.toFixed(2)})`);
-                }
-              }
-            }
-          }
-
-          if (p) {
-            h.currentPrice = p.close;
-            patchIndiaDB(h.symbol, p.close, p.change, p.changePct);
+          if (match && match[1]) {
+            const price = parseFloat(match[1]);
+            const prev = prevMatch ? parseFloat(prevMatch[1]) : price;
+            const change = price - prev;
+            const changePct = prev > 0 ? (change / prev) * 100 : 0;
+            h.currentPrice = price;
+            patchIndiaDB(h.symbol, price, change, changePct);
             updated++;
           } else {
-            failed.push(h.symbol);
-            console.log(`[NotFound] ${h.symbol} (${h.name})`);
+            // Fallback: Yahoo Finance
+            const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(h.symbol)}.NS?interval=1d&range=1d`;
+            const yahooProxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`;
+            const yr = await fetch(yahooProxy);
+            const ydata = await yr.json();
+            const meta = ydata?.chart?.result?.[0]?.meta;
+            const yprice = meta?.regularMarketPrice;
+            if (yprice > 0) {
+              const yprev = meta.previousClose || meta.chartPreviousClose || yprice;
+              h.currentPrice = yprice;
+              patchIndiaDB(h.symbol, yprice, yprice - yprev, ((yprice - yprev) / yprev) * 100);
+              updated++;
+            } else {
+              failed.push(h.symbol);
+            }
           }
+        } catch {
+          failed.push(h.symbol);
         }
-      } else {
-        indiaHoldings.forEach(h => failed.push(h.symbol));
-      }
-    }
 
-    if (failed.length && bhavcopy) {
-      console.log('=== INDIAN STOCKS NOT FOUND ===');
-      failed.forEach(sym => {
-        const prefix = sym.toUpperCase().replace(/\s+/g, '').slice(0, 4);
-        const similar = Object.keys(bhavcopy).filter(k => k.startsWith(prefix)).slice(0, 8);
-        console.log(`  "${sym}" → similar in NSE:`, similar);
-      });
+        await new Promise(r => setTimeout(r, 300));
+      }
     }
 
     if (failed.length) {
@@ -1787,7 +1743,6 @@ async function fetchLivePrices() {
     renderPortfolio();
 
     let msg = `Updated ${updated} of ${state.portfolio.length} holdings`;
-    if (bhavDate) msg += ` (NSE: ${bhavDate})`;
     if (failed.length) msg += ` — ${failed.length} not found`;
     toast(msg, failed.length && updated === 0 ? 'error' : failed.length ? 'warning' : 'success');
 
