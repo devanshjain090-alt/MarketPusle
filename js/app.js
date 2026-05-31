@@ -1776,6 +1776,13 @@ async function fetchLivePrices() {
       });
     }
 
+    if (failed.length) {
+      const failedIndian = failed.filter(sym =>
+        state.portfolio.find(h => h.symbol === sym && h.market === 'india')
+      );
+      if (failedIndian.length) showSymbolFixModal(failedIndian);
+    }
+
     savePortfolio();
     renderPortfolio();
 
@@ -5151,4 +5158,60 @@ function updateIndiaBannerState() {
 
 updateIndiaBannerState();
 setInterval(updateIndiaBannerState, 5 * 60 * 1000);
+
+function showSymbolFixModal(failedSymbols) {
+  const existing = document.getElementById('symbolFixModal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'symbolFixModal';
+  modal.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px;z-index:9999;min-width:420px;max-width:520px;box-shadow:0 20px 60px rgba(0,0,0,0.5)';
+
+  modal.innerHTML = `
+    <h3 style="margin:0 0 8px;color:var(--text)"><i class="fa-solid fa-triangle-exclamation" style="color:var(--yellow);margin-right:8px"></i>Fix NSE Symbols</h3>
+    <p style="font-size:12px;color:var(--text3);margin:0 0 16px">These symbols weren't found on NSE. Enter the correct NSE ticker for each:</p>
+    <div id="symbolFixRows">
+      ${failedSymbols.map(sym => `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="font-family:'JetBrains Mono',monospace;color:var(--red);width:120px;font-size:13px;flex-shrink:0">${sym}</span>
+          <span style="color:var(--text3);font-size:12px">→</span>
+          <input type="text" id="fix_${sym}" placeholder="NSE symbol e.g. TATAPOWER"
+            style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:13px;font-family:'JetBrains Mono',monospace;text-transform:uppercase"
+            oninput="this.value=this.value.toUpperCase()">
+        </div>
+      `).join('')}
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button onclick="document.getElementById('symbolFixModal').remove()"
+        style="padding:8px 16px;background:var(--bg3);border:1px solid var(--border);color:var(--text3);border-radius:6px;cursor:pointer;font-size:13px">Skip</button>
+      <button onclick="applySymbolFixes(${JSON.stringify(failedSymbols)})"
+        style="padding:8px 16px;background:var(--accent);border:none;color:#fff;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">Save &amp; Retry</button>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+}
+
+function applySymbolFixes(failedSymbols) {
+  let fixed = 0;
+  failedSymbols.forEach(oldSym => {
+    const input = document.getElementById(`fix_${oldSym}`);
+    const newSym = (input?.value || '').trim().toUpperCase();
+    if (!newSym || newSym === oldSym) return;
+    Object.values(state.portfolios).forEach(portfolio => {
+      portfolio.forEach(h => {
+        if (h.symbol === oldSym && h.market === 'india') {
+          h.symbol = newSym;
+          fixed++;
+        }
+      });
+    });
+  });
+  document.getElementById('symbolFixModal')?.remove();
+  if (fixed > 0) {
+    savePortfolio();
+    toast(`Updated ${fixed} symbol${fixed > 1 ? 's' : ''} — refreshing prices…`);
+    setTimeout(() => fetchLivePrices(), 500);
+  }
+}
 
