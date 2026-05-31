@@ -15,6 +15,7 @@ export default async function handler(req, res) {
       ist.setDate(ist.getDate() - 1);
     }
 
+    // Try up to 5 days back to skip weekends and holidays
     let csv = null;
     let usedDate = null;
 
