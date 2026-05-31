@@ -1760,3 +1760,60 @@ body.mobile-open .mobile-overlay { display: block; }
   .ob-card.ob-step::before,
   .ob-card.ob-step::after { display: none; }
 }
+
+/* ===== India EOD Banner ===== */
+.india-eod-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 18px;
+  background: rgba(251, 146, 60, 0.06);
+  border: 1px solid rgba(251, 146, 60, 0.25);
+  border-left: 3px solid #fb923c;
+  margin-bottom: 16px;
+  position: relative;
+}
+.india-eod-banner .banner-icon {
+  color: #fb923c;
+  font-size: 18px;
+  padding-top: 2px;
+  flex-shrink: 0;
+}
+.india-eod-banner .banner-content { flex: 1; }
+.india-eod-banner .banner-title {
+  font-family: 'DM Mono', 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #fb923c;
+  margin-bottom: 5px;
+}
+.india-eod-banner .banner-text {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #9a9488;
+}
+.india-eod-banner .banner-text strong { color: #c8a96e; }
+.india-eod-banner .banner-close {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: #4a4840;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+}
+.india-eod-banner .banner-close:hover { color: #c8a96e; }
+.eod-tag {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: #fb923c;
+  background: rgba(251, 146, 60, 0.1);
+  padding: 2px 5px;
+  margin-left: 4px;
+  border: 1px solid rgba(251, 146, 60, 0.3);
+}

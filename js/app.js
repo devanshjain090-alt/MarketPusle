@@ -1560,7 +1560,7 @@ function renderPortfolio() {
         <td>${isIndia?'🇮🇳':'🇺🇸'}</td>
         <td class="td-num td-price-edit" title="Click to update quantity" onclick="editQty(this,${i})">${h.qty} <span style="font-size:9px;opacity:0.4;margin-left:2px">✎</span></td>
         <td class="td-num td-price-edit" title="Click to update buy price" onclick="editBuyPrice(this,${i})">${fmt2(h.buyPrice)} <span style="font-size:9px;opacity:0.4;margin-left:2px">✎</span></td>
-        <td class="td-num td-price-edit" title="Click to update current price" onclick="editCurrentPrice(this,${i})">${fmt2(h.currentPrice)} <span style="font-size:9px;opacity:0.4;margin-left:2px">✎</span></td>
+        <td class="td-num td-price-edit" title="Click to update current price" onclick="editCurrentPrice(this,${i})">${fmt2(h.currentPrice)}${isIndia ? ' <span class="eod-tag">EOD</span>' : ''} <span style="font-size:9px;opacity:0.4;margin-left:2px">✎</span></td>
         <td class="td-num">${fmt2(invested)}</td>
         <td class="td-num">${fmt2(currVal)}</td>
         <td class="td-num ${chgClass(pnl)}">${chgSign(pnl)}${fmt2(Math.abs(pnl))}</td>
@@ -1646,108 +1646,95 @@ async function fetchLocalProxy(symbols, market = 'india') {
 async function fetchLivePrices() {
   if (!state.portfolio.length) return;
   const btn = document.getElementById('livePricesBtn');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-rotate fa-spin"></i> Fetching…'; }
-
-  const usHoldings    = state.portfolio.filter(h => h.market === 'us');
-  const indiaHoldings = state.portfolio.filter(h => h.market === 'india');
-  let updated = 0;
-
-  // ── US: Twelve Data → local proxy fallback ───────────────────────────
-  if (usHoldings.length) {
-    const usUpdated = new Set();
-    try {
-      const symStr = usHoldings.map(h => h.symbol).join(',');
-      const res = await fetch(`${TD_BASE}/price?symbol=${encodeURIComponent(symStr)}&apikey=${TD_KEY}`);
-      const data = await res.json();
-      usHoldings.forEach(h => {
-        const entry = usHoldings.length === 1 ? data : data[h.symbol];
-        const price = parseFloat(entry?.price);
-        if (price > 0) { h.currentPrice = price; updated++; usUpdated.add(h.symbol); }
-      });
-    } catch(e) { console.warn('US Twelve Data error:', e); }
-
-    const usMissing = usHoldings.filter(h => !usUpdated.has(h.symbol));
-    if (usMissing.length) {
-      const proxyData = await fetchLocalProxy(usMissing.map(h => h.symbol), 'us');
-      for (const h of usMissing) {
-        const d = proxyData[h.symbol];
-        if (d?.price > 0) { h.currentPrice = d.price; updated++; }
-      }
-    }
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
   }
 
-  // ── India: local proxy → Gemini AI → TradingView Scanner → Yahoo ────
-  if (indiaHoldings.length) {
-    const indiaUpdated = new Set();
-    const allSymbols = indiaHoldings.map(h => h.symbol);
+  try {
+    const hasIndian = state.portfolio.some(h => h.market === 'india');
+    let bhavcopy = null;
+    let bhavDate = null;
 
-    // Step 1: local proxy (fastest — works when node server.js is running on port 3001)
-    if (btn) btn.innerHTML = '<i class="fa-solid fa-rotate fa-spin"></i> Fetching live prices…';
-    const proxyPrices = await fetchLocalProxy(allSymbols, 'india');
-    for (const h of indiaHoldings) {
-      const d = proxyPrices[h.symbol];
-      if (d?.price > 0) {
-        h.currentPrice = d.price;
-        patchIndiaDB(h.symbol, d.price, d.chg, d.chgPct);
-        updated++;
-        indiaUpdated.add(h.symbol);
+    if (hasIndian) {
+      try {
+        const r = await fetch(`${PROXY_BASE.replace('/ai', '')}/bhavcopy`);
+        const data = await r.json();
+        if (data.success) {
+          bhavcopy = data.prices;
+          bhavDate = data.date;
+        } else {
+          toast(data.error || 'Could not fetch Indian prices', 'error');
+        }
+      } catch (e) {
+        toast('Bhavcopy fetch failed: ' + e.message, 'error');
       }
     }
 
-    // Step 2: Gemini AI with Google Search grounding for anything still missing
-    const missing0 = indiaHoldings.filter(h => !indiaUpdated.has(h.symbol));
-    if (missing0.length) {
-      if (btn) btn.innerHTML = '<i class="fa-brands fa-google fa-spin"></i> Searching Google for prices…';
-      const aiPrices = await fetchIndiaAIBatch(missing0.map(h => h.symbol));
-      for (const h of missing0) {
-        const d = aiPrices[h.symbol];
-        if (d?.price > 0) {
-          h.currentPrice = d.price;
-          patchIndiaDB(h.symbol, d.price, d.change ?? 0, d.changePct ?? 0);
-          updated++;
-          indiaUpdated.add(h.symbol);
+    let updated = 0;
+    const failed = [];
+
+    // ── US: Twelve Data batch → local proxy fallback ─────────────────────
+    const usHoldings = state.portfolio.filter(h => h.market === 'us');
+    if (usHoldings.length) {
+      const usUpdated = new Set();
+      try {
+        const symStr = usHoldings.map(h => h.symbol).join(',');
+        const res = await fetch(`${TD_BASE}/price?symbol=${encodeURIComponent(symStr)}&apikey=${TD_KEY}`);
+        const data = await res.json();
+        usHoldings.forEach(h => {
+          const entry = usHoldings.length === 1 ? data : data[h.symbol];
+          const price = parseFloat(entry?.price);
+          if (price > 0) { h.currentPrice = price; updated++; usUpdated.add(h.symbol); }
+        });
+      } catch(e) { console.warn('US Twelve Data error:', e); }
+
+      const usMissing = usHoldings.filter(h => !usUpdated.has(h.symbol));
+      if (usMissing.length) {
+        const proxyData = await fetchLocalProxy(usMissing.map(h => h.symbol), 'us');
+        for (const h of usMissing) {
+          const d = proxyData[h.symbol];
+          if (d?.price > 0) { h.currentPrice = d.price; updated++; }
+          else { failed.push(h.symbol); }
         }
       }
     }
 
-    // Step 3: TradingView Scanner for anything still missing
-    const missing1 = indiaHoldings.filter(h => !indiaUpdated.has(h.symbol));
-    if (missing1.length) {
-      if (btn) btn.innerHTML = '<i class="fa-solid fa-rotate fa-spin"></i> Fetching BSE prices…';
-      const tvScanData = await fetchTVScannerIndia(missing1.map(h => h.symbol));
-      for (const h of missing1) {
-        const d = tvScanData[h.symbol];
-        if (d?.price > 0) {
-          h.currentPrice = d.price;
-          patchIndiaDB(h.symbol, d.price, d.chg, d.chgPct);
-          updated++;
-          indiaUpdated.add(h.symbol);
+    // ── India: NSE Bhavcopy (EOD) ─────────────────────────────────────────
+    const indiaHoldings = state.portfolio.filter(h => h.market === 'india');
+    if (indiaHoldings.length) {
+      if (bhavcopy) {
+        for (const h of indiaHoldings) {
+          const p = bhavcopy[h.symbol.toUpperCase()];
+          if (p) {
+            h.currentPrice = p.close;
+            patchIndiaDB(h.symbol, p.close, p.change, p.changePct);
+            updated++;
+          } else {
+            failed.push(h.symbol);
+          }
         }
+      } else {
+        indiaHoldings.forEach(h => failed.push(h.symbol));
       }
     }
 
-    // Step 4: Yahoo Finance direct for anything still missing
-    const missing2 = indiaHoldings.filter(h => !indiaUpdated.has(h.symbol));
-    if (missing2.length) {
-      const yahooData = await fetchYahooChartIndia(missing2.map(h => h.symbol));
-      for (const h of missing2) {
-        const d = yahooData[h.symbol];
-        if (d?.price > 0) {
-          h.currentPrice = d.price;
-          patchIndiaDB(h.symbol, d.price, d.chg, d.chgPct);
-          updated++;
-          indiaUpdated.add(h.symbol);
-        }
-      }
-    }
+    savePortfolio();
+    renderPortfolio();
+
+    let msg = `Updated ${updated} of ${state.portfolio.length} holdings`;
+    if (bhavDate) msg += ` (NSE: ${bhavDate})`;
+    if (failed.length) msg += ` — ${failed.length} not found`;
+    toast(msg, failed.length && updated === 0 ? 'error' : failed.length ? 'warning' : 'success');
+
+  } catch (e) {
+    toast('Update failed: ' + e.message, 'error');
   }
 
-  if (updated > 0) { savePortfolio(); renderPortfolio(); }
-  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Live Prices'; }
-
-  if (updated === state.portfolio.length) toast(`Live prices updated for all ${updated} holdings`);
-  else if (updated > 0) toast(`Live prices updated for ${updated}/${state.portfolio.length} holdings`);
-  else toast('Could not fetch live prices — market may be closed', 'error');
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Live Prices';
+  }
 }
 
 function editQty(cell, idx) {
@@ -5055,4 +5042,47 @@ function signOut() {
   localStorage.removeItem('mp_user');
   window.location.replace('login.html');
 }
+
+function getIndianMarketState() {
+  const now = new Date();
+  const ist = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+  const day = ist.getUTCDay();
+  const decimalHour = ist.getUTCHours() + (ist.getUTCMinutes() / 60);
+
+  if (day === 0 || day === 6) {
+    return { state: 'weekend', message: 'NSE closed for weekend. Showing last available prices.', canUpdate: true };
+  }
+  if (decimalHour >= 3.75 && decimalHour < 10) {
+    return { state: 'open', message: 'Market open (9:15 AM – 3:30 PM IST). Indian prices will update after close, post 6 PM IST.', canUpdate: false };
+  }
+  if (decimalHour >= 10 && decimalHour < 12.5) {
+    return { state: 'awaiting', message: 'Market closed. End-of-day NSE prices available after 6 PM IST.', canUpdate: false };
+  }
+  return { state: 'eod-ready', message: '<strong>End-of-day prices available.</strong> Click Live Prices to update.', canUpdate: true };
+}
+
+function updateIndiaBannerState() {
+  const banner = document.getElementById('indiaEodBanner');
+  const text = document.getElementById('indiaEodText');
+  const btn = document.getElementById('livePricesBtn');
+  if (!banner || !text) return;
+
+  const mktState = getIndianMarketState();
+  text.innerHTML = mktState.message;
+
+  if (btn) {
+    if (mktState.canUpdate) {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.title = '';
+    } else {
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.title = 'Indian prices available after 6 PM IST';
+    }
+  }
+}
+
+updateIndiaBannerState();
+setInterval(updateIndiaBannerState, 5 * 60 * 1000);
 
