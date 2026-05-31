@@ -1749,14 +1749,12 @@ async function fetchLivePrices() {
     }
 
     if (failed.length && bhavcopy) {
-      console.log('Failed symbols:', failed);
-      console.log('Bhavcopy has these similar keys:', failed.map(s => {
-        const prefix = s.slice(0, 4).toUpperCase();
-        return {
-          yours: s,
-          similar: Object.keys(bhavcopy).filter(k => k.startsWith(prefix)).slice(0, 5)
-        };
-      }));
+      console.log('=== INDIAN STOCKS NOT FOUND ===');
+      failed.forEach(sym => {
+        const prefix = sym.toUpperCase().replace(/\s+/g, '').slice(0, 4);
+        const similar = Object.keys(bhavcopy).filter(k => k.startsWith(prefix)).slice(0, 8);
+        console.log(`  "${sym}" → similar in NSE:`, similar);
+      });
     }
 
     savePortfolio();
