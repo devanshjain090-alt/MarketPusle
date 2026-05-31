@@ -1716,25 +1716,62 @@ async function fetchLivePrices() {
           let p = bhavcopy[normalizedSymbol];
 
           if (!p) {
+            // 1. Static alias map
             const aliases = {
               'L&T': 'LT', 'LT': 'LT', 'LARSEN': 'LT',
               'M&M': 'M&M', 'MAHINDRA': 'M&M',
-              'TATAMOTOR': 'TATAMOTORS', 'TATAMOTORS': 'TATAMOTORS',
-              'HDFCBANK': 'HDFCBANK', 'HDFC': 'HDFCBANK',
-              'ICICIBANK': 'ICICIBANK',
+              'TATAMOTOR': 'TATAMOTORS',
               'HUL': 'HINDUNILVR', 'HINDUNILVR': 'HINDUNILVR',
-              'KOTAKBANK': 'KOTAKBANK',
-              'BAJAJ-AUTO': 'BAJAJ-AUTO', 'BAJAJAUTO': 'BAJAJ-AUTO', 'BAJAJ AUTO': 'BAJAJ-AUTO',
+              'HDFC': 'HDFCBANK',
+              'BAJAJ-AUTO': 'BAJAJ-AUTO', 'BAJAJAUTO': 'BAJAJ-AUTO',
               'VEDANTA': 'VEDL',
-              'JAYASWAL': 'JAYNECOIND'
+              'JAYASWAL': 'JAYNECOIND',
+              'RAILWAY': 'RAILTEL',
+              'JAIPRAKASH': 'JAIPURKURT',
+              'MAXIMUS': 'MAXIND',
+              'NIPPON': 'NIPPOBATRY',
+              'NMDCSTEEL': 'NMDC',
+              'SBIBALANCE': 'SBIBPB',
+              'STEELEXCHA': 'STEELXIND',
+              'URJAGLOBAL': 'URJA',
+              'AWLAGRIBUS': 'AWL',
+              'GEMSTONE': 'GEMAROMA',
+              'CHDCHEMICA': 'CHDCHEM',
+              'EKIENERGY': 'EKI',
+              'FUTURE': 'FEL',
+              'SPACENET': 'SPCENET',
+              'VISAGAR': 'VIVIDHA',
+              'VISESH': 'VISESHINFO',
+              'JOHNSON': 'JCHAC',
             };
             if (aliases[normalizedSymbol]) p = bhavcopy[aliases[normalizedSymbol]];
           }
 
           if (!p) {
-            const prefix = normalizedSymbol.slice(0, 6);
-            const match = Object.keys(bhavcopy).find(k => k.startsWith(prefix));
-            if (match) p = bhavcopy[match];
+            // 2. Fuzzy match — find best bhavcopy key for this symbol
+            const bhavKeys = Object.keys(bhavcopy);
+            const sym = normalizedSymbol;
+
+            const subMatches = bhavKeys.filter(k => k.includes(sym) || sym.includes(k));
+
+            if (subMatches.length === 1) {
+              p = bhavcopy[subMatches[0]];
+              console.log(`[AutoAlias] ${sym} → ${subMatches[0]}`);
+            } else if (subMatches.length > 1) {
+              const best = subMatches.reduce((a, b) =>
+                Math.abs(a.length - sym.length) <= Math.abs(b.length - sym.length) ? a : b
+              );
+              p = bhavcopy[best];
+              console.log(`[AutoAlias] ${sym} → ${best} (from ${subMatches.length} candidates: ${subMatches.join(', ')})`);
+            } else {
+              // 3. Prefix fallback — only when exactly one key matches (safe single-candidate)
+              const prefix = sym.slice(0, 5);
+              const prefixMatches = bhavKeys.filter(k => k.startsWith(prefix));
+              if (prefixMatches.length === 1) {
+                p = bhavcopy[prefixMatches[0]];
+                console.log(`[PrefixAlias] ${sym} → ${prefixMatches[0]}`);
+              }
+            }
           }
 
           if (p) {
