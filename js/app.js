@@ -1724,7 +1724,9 @@ async function fetchLivePrices() {
               'ICICIBANK': 'ICICIBANK',
               'HUL': 'HINDUNILVR', 'HINDUNILVR': 'HINDUNILVR',
               'KOTAKBANK': 'KOTAKBANK',
-              'BAJAJ-AUTO': 'BAJAJ-AUTO', 'BAJAJAUTO': 'BAJAJ-AUTO', 'BAJAJ AUTO': 'BAJAJ-AUTO'
+              'BAJAJ-AUTO': 'BAJAJ-AUTO', 'BAJAJAUTO': 'BAJAJ-AUTO', 'BAJAJ AUTO': 'BAJAJ-AUTO',
+              'VEDANTA': 'VEDL',
+              'JAYASWAL': 'JAYNECOIND'
             };
             if (aliases[normalizedSymbol]) p = bhavcopy[aliases[normalizedSymbol]];
           }
