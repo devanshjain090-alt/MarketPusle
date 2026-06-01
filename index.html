@@ -654,45 +654,11 @@
       </div>
     </div>
 
-    <!-- US Screener -->
-    <div id="tv-screener-us">
-      <div class="tradingview-widget-container">
-        <div class="tradingview-widget-container__widget"></div>
-        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-screener.js" async>
-        {
-          "width": "100%",
-          "height": 720,
-          "defaultColumn": "overview",
-          "defaultScreen": "most_capitalized",
-          "market": "america",
-          "showToolbar": true,
-          "colorTheme": "dark",
-          "locale": "en",
-          "isTransparent": true
-        }
-        </script>
-      </div>
-    </div>
+    <!-- US Screener — widget injected lazily by app.js when section becomes visible -->
+    <div id="tv-screener-us"></div>
 
-    <!-- India Screener -->
-    <div id="tv-screener-india" style="display:none">
-      <div class="tradingview-widget-container">
-        <div class="tradingview-widget-container__widget"></div>
-        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-screener.js" async>
-        {
-          "width": "100%",
-          "height": 720,
-          "defaultColumn": "overview",
-          "defaultScreen": "most_capitalized",
-          "market": "india",
-          "showToolbar": true,
-          "colorTheme": "dark",
-          "locale": "en",
-          "isTransparent": true
-        }
-        </script>
-      </div>
-    </div>
+    <!-- India Screener — widget injected lazily by app.js when tab is first clicked -->
+    <div id="tv-screener-india" style="display:none"></div>
   </section>
 
   <!-- =================== TOP PICKS =================== -->

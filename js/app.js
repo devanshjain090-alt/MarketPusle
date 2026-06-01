@@ -182,7 +182,7 @@ function switchSection(id) {
   if (id === 'us-terminal' && !state.tvUS) initUSChart('NASDAQ:AAPL');
   if (id === 'india-terminal' && !state.tvIndia) initIndiaChart('BSE:RELIANCE');
   if (id === 'portfolio') { renderPortfolio(); fetchLivePrices(); }
-  if (id === 'screener') { /* TradingView widget loads itself */ }
+  if (id === 'screener') { _initTVScreener(state.screenerMkt); }
   if (id === 'picks') {
     renderPicks();
     // Trigger live refresh once per section visit if not yet loaded
@@ -2940,12 +2940,51 @@ function screenerChangePage(dir) {
   $('screenerBody')?.closest('.table-wrap')?.scrollTo(0, 0);
 }
 
+// Track which screener markets have had their widget injected
+const _screenerInited = { us: false, india: false };
+
+function _initTVScreener(mkt) {
+  if (_screenerInited[mkt]) return;
+  _screenerInited[mkt] = true;
+  const containerId = mkt === 'us' ? 'tv-screener-us' : 'tv-screener-india';
+  const container = $(containerId);
+  if (!container) return;
+
+  const market = mkt === 'us' ? 'america' : 'india';
+  const availH = Math.max(550, window.innerHeight - 180);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'tradingview-widget-container';
+  const inner = document.createElement('div');
+  inner.className = 'tradingview-widget-container__widget';
+  wrap.appendChild(inner);
+
+  const script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.async = true;
+  script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-screener.js';
+  script.textContent = JSON.stringify({
+    width: '100%',
+    height: availH,
+    defaultColumn: 'overview',
+    defaultScreen: 'most_capitalized',
+    market: market,
+    showToolbar: true,
+    colorTheme: 'dark',
+    locale: 'en',
+    isTransparent: true,
+  });
+  wrap.appendChild(script);
+  container.appendChild(wrap);
+}
+
 function setScreenerMkt(mkt) {
   state.screenerMkt = mkt;
   document.querySelectorAll('.smtab').forEach(b => b.classList.toggle('active', b.dataset.smkt===mkt));
   const usEl = $('tv-screener-us'), inEl = $('tv-screener-india');
   if (usEl) usEl.style.display = mkt === 'us' ? 'block' : 'none';
   if (inEl) inEl.style.display = mkt === 'india' ? 'block' : 'none';
+  _initTVScreener(mkt);
 }
 
 function runScreener() {
