@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(curl -s \"https://api.marketstack.com/v1/tickers?access_key=d8960bfcff9f4319a7c3bca134ae4b30&limit=5\")"
+      "Bash(curl -s \"https://api.marketstack.com/v1/tickers?access_key=d8960bfcff9f4319a7c3bca134ae4b30&limit=5\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\SAMSUNG\\\\OneDrive\\\\stock market\" -Recurse -Force)",
+      "Bash(Select-Object FullName, PSIsContainer)",
+      "Bash(Sort-Object FullName)"
     ]
   }
 }

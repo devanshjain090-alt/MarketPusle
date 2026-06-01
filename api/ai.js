@@ -23,6 +23,12 @@ export default async function handler(req, res) {
       if (body.systemPrompt) {
         geminiBody.systemInstruction = { parts: [{ text: body.systemPrompt }] };
       }
+      if (body.tools) {
+        geminiBody.tools = body.tools;
+      }
+      if (body.generationConfig) {
+        geminiBody.generationConfig = body.generationConfig;
+      }
     }
     // Case 2: app sends a prompt (for roast)
     else if (body.prompt) {

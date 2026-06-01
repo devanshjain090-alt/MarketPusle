@@ -380,7 +380,7 @@ async function fetchIndiaAIPrice(symbol) {
       { method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           contents: [{role: 'user', parts: [{text: prompt}]}],
-          tools: [{googleSearch: {}}],
+          tools: [{google_search: {}}],
           generationConfig: {temperature: 0, maxOutputTokens: 300}
         })
       }
@@ -412,7 +412,7 @@ async function fetchIndiaAIBatch(symbols) {
         { method: 'POST', headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({
             contents: [{role: 'user', parts: [{text: prompt}]}],
-            tools: [{googleSearch: {}}],
+            tools: [{google_search: {}}],
             generationConfig: {temperature: 0, maxOutputTokens: 1200}
           })
         }
@@ -1686,70 +1686,84 @@ async function fetchLivePrices() {
     if (indiaHoldings.length) {
       if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Asking Gemini…';
 
-      const key = _geminiKey();
-      if (!key) {
-        toast('Set your Gemini API key in AI Chat to fetch Indian prices', 'error');
-        indiaHoldings.forEach(h => failed.push(h.symbol));
-      } else {
-        const stockList = indiaHoldings.map(h => `${h.symbol} (${h.name})`).join(', ');
-
-        const prompt = `Search Google right now and find the latest NSE closing prices for these Indian stocks: ${stockList}.
+      const stockList = indiaHoldings.map(h => `${h.symbol} (${h.name})`).join(', ');
+      const prompt = `Search Google right now and find the latest NSE closing prices for these Indian stocks: ${stockList}.
 
 Return ONLY a raw JSON object like this, no markdown, no explanation:
 {"RELIANCE": 1321.9, "TCS": 2256.0, "TATAMOTORS": 652.3}
 
 Use the stock symbol as the key. If a stock is not found on NSE, skip it. Search each one on Google Finance or NSE India.`;
 
-        try {
-          const res = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
+      const geminiContents = [{ role: 'user', parts: [{ text: prompt }] }];
+      const geminiTools = [{ google_search: {} }];
+      const geminiConfig = { temperature: 0, maxOutputTokens: 2000 };
+
+      // Prefer user's own key (direct call); fall back to Vercel proxy (server key)
+      const userKey = _geminiKey();
+      let responseText = null;
+
+      try {
+        let res;
+        if (userKey) {
+          res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${userKey}`,
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                tools: [{ googleSearch: {} }],
-                generationConfig: { temperature: 0, maxOutputTokens: 2000 }
-              })
+              body: JSON.stringify({ contents: geminiContents, tools: geminiTools, generationConfig: geminiConfig })
             }
           );
-
           if (res.ok) {
             const data = await res.json();
-            const text = (data.candidates?.[0]?.content?.parts || [])
-              .map(p => p.text || '').join('');
-            const match = text.match(/\{[\s\S]*\}/);
+            responseText = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+          }
+        }
 
-            if (match) {
-              const prices = JSON.parse(match[0]);
-              indiaHoldings.forEach(h => {
-                const sym = h.symbol.toUpperCase()
-                  .replace(/\.NS$|\.BO$/g, '')
-                  .replace(/^NSE:|^BSE:/g, '');
-                const price = prices[sym] || prices[h.symbol];
-                if (price > 0) {
-                  const prev = h.currentPrice || h.buyPrice;
-                  const change = price - prev;
-                  const changePct = prev > 0 ? (change / prev) * 100 : 0;
-                  h.currentPrice = price;
-                  patchIndiaDB(h.symbol, price, change, changePct);
-                  updated++;
-                } else {
-                  failed.push(h.symbol);
-                }
-              });
-            } else {
-              indiaHoldings.forEach(h => failed.push(h.symbol));
-              toast('Gemini returned unexpected format', 'error');
-            }
+        // Fallback: route through Vercel proxy (uses server-side GEMINI_KEY)
+        if (!responseText) {
+          res = await fetch(PROXY_BASE, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: geminiContents, tools: geminiTools, generationConfig: geminiConfig })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            responseText = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('')
+              || data.reply || data.text || '';
+          }
+        }
+
+        if (responseText) {
+          const match = responseText.match(/\{[\s\S]*\}/);
+          if (match) {
+            const prices = JSON.parse(match[0]);
+            indiaHoldings.forEach(h => {
+              const sym = h.symbol.toUpperCase()
+                .replace(/\.NS$|\.BO$/g, '')
+                .replace(/^NSE:|^BSE:/g, '');
+              const price = prices[sym] || prices[h.symbol];
+              if (price > 0) {
+                const prev = h.currentPrice || h.buyPrice;
+                const change = price - prev;
+                const changePct = prev > 0 ? (change / prev) * 100 : 0;
+                h.currentPrice = price;
+                patchIndiaDB(h.symbol, price, change, changePct);
+                updated++;
+              } else {
+                failed.push(h.symbol);
+              }
+            });
           } else {
             indiaHoldings.forEach(h => failed.push(h.symbol));
-            toast('Gemini request failed', 'error');
+            toast('Gemini returned unexpected format', 'error');
           }
-        } catch(e) {
+        } else {
           indiaHoldings.forEach(h => failed.push(h.symbol));
-          toast('Gemini error: ' + e.message, 'error');
+          toast('Gemini price fetch failed', 'error');
         }
+      } catch(e) {
+        indiaHoldings.forEach(h => failed.push(h.symbol));
+        toast('Gemini error: ' + e.message, 'error');
       }
     }
 
