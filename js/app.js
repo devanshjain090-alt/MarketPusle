@@ -1525,11 +1525,6 @@ function renderPortfolio() {
   const investedCombINR = investUS * USD_TO_INR + investIN;
   const totalPnlINR     = pnlUS * USD_TO_INR + pnlIN;
   const pct             = investedCombINR > 0 ? totalPnlINR / investedCombINR * 100 : 0;
-  const dayPnlINR       = state.portfolio.reduce((a, h) => {
-    const v = h.qty * h.currentPrice * (h.dayChgPct / 100);
-    return a + (h.market === 'india' ? v : v * USD_TO_INR);
-  }, 0);
-
   setEl('portTotalVal', fmtINR(totalCombINR));
   const pnlEl = $('portTotalPnl');
   if (pnlEl) { pnlEl.textContent = `${chgSign(totalPnlINR)}${fmtINR(Math.abs(totalPnlINR))} (${chgSign(pct)}${Math.abs(pct).toFixed(2)}%)`; pnlEl.className = 'pov-sub ' + chgClass(totalPnlINR); }
@@ -1537,8 +1532,15 @@ function renderPortfolio() {
   setEl('portUSPnl', `${chgSign(pnlUS)}${fmtINR(Math.abs(pnlUS * USD_TO_INR))}`);
   setEl('portIndiaVal', fmtINR(totalIN));
   setEl('portIndiaPnl', `${chgSign(pnlIN)}${fmtINR(Math.abs(pnlIN))}`);
-  const dayEl = $('portDayPnl');
-  if (dayEl) { dayEl.textContent = `${chgSign(dayPnlINR)}${fmtINR(Math.abs(dayPnlINR))}`; dayEl.className = 'pov-value ' + chgClass(dayPnlINR); }
+
+  // Total P&L breakdown card
+  const pnlBigEl = $('portTotalPnlBig');
+  if (pnlBigEl) { pnlBigEl.textContent = `${chgSign(totalPnlINR)}${fmtINR(Math.abs(totalPnlINR))} (${chgSign(pct)}${Math.abs(pct).toFixed(2)}%)`; pnlBigEl.className = 'pov-value ' + chgClass(totalPnlINR); }
+  const usPnlCardEl = $('portUSPnlCard');
+  if (usPnlCardEl) { usPnlCardEl.textContent = `${chgSign(pnlUS)}${fmtINR(Math.abs(pnlUS * USD_TO_INR))}`; usPnlCardEl.className = 'pov-pnl-val ' + chgClass(pnlUS); }
+  const inPnlCardEl = $('portIndiaPnlCard');
+  if (inPnlCardEl) { inPnlCardEl.textContent = `${chgSign(pnlIN)}${fmtINR(Math.abs(pnlIN))}`; inPnlCardEl.className = 'pov-pnl-val ' + chgClass(pnlIN); }
+
   setEl('portHoldingsCount', state.portfolio.length);
 
   // Holdings table
@@ -1547,7 +1549,8 @@ function renderPortfolio() {
   if (!holdings.length) {
     body.innerHTML = `<tr><td colspan="12" class="empty-td"><div class="empty-state"><i class="fa-solid fa-briefcase"></i><p>No holdings match this filter.</p></div></td></tr>`;
   } else {
-    body.innerHTML = holdings.map((h,i) => {
+    const renderRow = (h, i) => {
+      const realIdx = state.portfolio.indexOf(h);
       const currVal = h.qty * h.currentPrice;
       const invested = h.qty * h.buyPrice;
       const pnl = currVal - invested;
@@ -1558,9 +1561,9 @@ function renderPortfolio() {
         <td><span class="td-sym">${h.symbol}</span></td>
         <td class="td-name">${h.name}</td>
         <td>${isIndia?'🇮🇳':'🇺🇸'}</td>
-        <td class="td-num td-price-edit" title="Click to update quantity" onclick="editQty(this,${i})">${h.qty} <span style="font-size:9px;opacity:0.4;margin-left:2px">✎</span></td>
-        <td class="td-num td-price-edit" title="Click to update buy price" onclick="editBuyPrice(this,${i})">${fmt2(h.buyPrice)} <span style="font-size:9px;opacity:0.4;margin-left:2px">✎</span></td>
-        <td class="td-num td-price-edit" title="Click to update current price" onclick="editCurrentPrice(this,${i})">${fmt2(h.currentPrice)}${isIndia ? ' <span class="eod-tag">EOD</span>' : ''} <span style="font-size:9px;opacity:0.4;margin-left:2px">✎</span></td>
+        <td class="td-num td-price-edit" title="Click to update quantity" onclick="editQty(this,${realIdx})">${h.qty} <span style="font-size:9px;opacity:0.4;margin-left:2px">✎</span></td>
+        <td class="td-num td-price-edit" title="Click to update buy price" onclick="editBuyPrice(this,${realIdx})">${fmt2(h.buyPrice)} <span style="font-size:9px;opacity:0.4;margin-left:2px">✎</span></td>
+        <td class="td-num td-price-edit" title="Click to update current price" onclick="editCurrentPrice(this,${realIdx})">${fmt2(h.currentPrice)}${isIndia ? ' <span class="eod-tag">EOD</span>' : ''} <span style="font-size:9px;opacity:0.4;margin-left:2px">✎</span></td>
         <td class="td-num">${fmt2(invested)}</td>
         <td class="td-num">${fmt2(currVal)}</td>
         <td class="td-num ${chgClass(pnl)}">${chgSign(pnl)}${fmt2(Math.abs(pnl))}</td>
@@ -1569,11 +1572,45 @@ function renderPortfolio() {
         <td>
           <div class="row-actions">
             <button class="btn-row-sm btn-view" onclick="${isIndia?`loadIndiaQuick('${h.symbol}')`:`loadUSQuick('${h.symbol}')`}">View</button>
-            <button class="btn-row-sm btn-delete" onclick="deleteHolding(${i})"><i class="fa-solid fa-trash"></i></button>
+            <button class="btn-row-sm btn-delete" onclick="deleteHolding(${realIdx})"><i class="fa-solid fa-trash"></i></button>
           </div>
         </td>
       </tr>`;
-    }).join('');
+    };
+
+    const sectionHeader = (flag, label, count, pnlVal, pnlPct) =>
+      `<tr class="holdings-section-hdr">
+        <td colspan="12">
+          <span class="hsh-flag">${flag}</span>
+          <span class="hsh-label">${label}</span>
+          <span class="hsh-count">${count} stock${count !== 1 ? 's' : ''}</span>
+          <span class="hsh-pnl ${chgClass(pnlVal)}">${chgSign(pnlVal)}${fmtINR(Math.abs(pnlVal))} (${chgSign(pnlPct)}${Math.abs(pnlPct).toFixed(2)}%)</span>
+        </td>
+      </tr>`;
+
+    if (filter === 'all') {
+      const indiaHoldings = holdings.filter(h => h.market === 'india');
+      const usHoldings    = holdings.filter(h => h.market === 'us');
+      let html = '';
+
+      if (indiaHoldings.length) {
+        const inv = indiaHoldings.reduce((a,h) => a + h.qty*h.buyPrice, 0);
+        const cur = indiaHoldings.reduce((a,h) => a + h.qty*h.currentPrice, 0);
+        const p = cur - inv; const pp = inv > 0 ? p/inv*100 : 0;
+        html += sectionHeader('🇮🇳', 'India Holdings', indiaHoldings.length, p, pp);
+        html += indiaHoldings.map(renderRow).join('');
+      }
+      if (usHoldings.length) {
+        const inv = usHoldings.reduce((a,h) => a + h.qty*h.buyPrice, 0);
+        const cur = usHoldings.reduce((a,h) => a + h.qty*h.currentPrice, 0);
+        const p = (cur - inv) * USD_TO_INR; const pp = inv > 0 ? (cur-inv)/inv*100 : 0;
+        html += sectionHeader('🇺🇸', 'US Holdings', usHoldings.length, p, pp);
+        html += usHoldings.map(renderRow).join('');
+      }
+      body.innerHTML = html;
+    } else {
+      body.innerHTML = holdings.map(renderRow).join('');
+    }
   }
 
   renderPortfolioCharts();

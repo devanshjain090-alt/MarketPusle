@@ -814,6 +814,21 @@ body.sidebar-rail .nav-item[data-label]:hover::after {
 .pov-value { font-family: var(--mono); font-size: 14px; color: var(--text); white-space: nowrap; }
 .pov-sub   { font-family: var(--mono); font-size: 10px; color: var(--text2); }
 
+/* P&L breakdown card */
+.pov-pnl-card .pov-info { gap: 4px; }
+.pov-pnl-split { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
+.pov-pnl-row   { display: flex; align-items: center; gap: 5px; }
+.pov-pnl-flag  { font-size: 11px; line-height: 1; }
+.pov-pnl-val   { font-family: var(--mono); font-size: 10px; white-space: nowrap; }
+
+/* Holdings section divider rows */
+.holdings-section-hdr td { background: var(--bg3); padding: 6px 12px; border-top: 1px solid var(--border); }
+.holdings-section-hdr:first-child td { border-top: none; }
+.hsh-flag  { font-size: 13px; margin-right: 6px; }
+.hsh-label { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text2); font-weight: 600; margin-right: 8px; }
+.hsh-count { font-family: var(--mono); font-size: 10px; color: var(--text3); margin-right: 12px; }
+.hsh-pnl   { font-family: var(--mono); font-size: 10px; }
+
 .charts-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
 .chart-card-label { font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text3); padding: 14px 16px 6px; }
 .chart-wrap { position: relative; height: 230px; padding: 4px 8px 12px; }

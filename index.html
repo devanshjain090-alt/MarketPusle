@@ -586,9 +586,16 @@
         <div class="pov-icon india-icon"><i class="fa-solid fa-indian-rupee-sign"></i></div>
         <div class="pov-info"><span class="pov-label">India Portfolio</span><span class="pov-value" id="portIndiaVal">₹0.00</span><span class="pov-sub" id="portIndiaPnl">—</span></div>
       </div>
-      <div class="pov-card">
+      <div class="pov-card pov-pnl-card">
         <div class="pov-icon"><i class="fa-solid fa-arrow-trend-up"></i></div>
-        <div class="pov-info"><span class="pov-label">Day P&amp;L</span><span class="pov-value positive" id="portDayPnl">₹0.00</span></div>
+        <div class="pov-info">
+          <span class="pov-label">Total P&amp;L</span>
+          <span class="pov-value" id="portTotalPnlBig">+₹0.00</span>
+          <div class="pov-pnl-split">
+            <div class="pov-pnl-row"><span class="pov-pnl-flag">🇺🇸</span><span class="pov-pnl-val" id="portUSPnlCard">—</span></div>
+            <div class="pov-pnl-row"><span class="pov-pnl-flag">🇮🇳</span><span class="pov-pnl-val" id="portIndiaPnlCard">—</span></div>
+          </div>
+        </div>
       </div>
       <div class="pov-card">
         <div class="pov-icon"><i class="fa-solid fa-layer-group"></i></div>
