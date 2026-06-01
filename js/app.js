@@ -2284,9 +2284,9 @@ function renamePortfolio(oldName, newName) {
 }
 
 function deleteActivePortfolio() {
-  if (Object.keys(state.portfolios).length <= 1) { toast('Cannot delete the only portfolio', 'error'); return; }
   if (!confirm(`Delete "${state.activePortfolio}"?`)) return;
   delete state.portfolios[state.activePortfolio];
+  if (!Object.keys(state.portfolios).length) state.portfolios['My Portfolio'] = [];
   state.activePortfolio = Object.keys(state.portfolios)[0];
   state.portfolio = state.portfolios[state.activePortfolio];
   savePortfolio(); renderPortfolioTabs(); renderPortfolio();
@@ -2311,10 +2311,10 @@ function setActivePortfolio(name) {
 }
 
 function deletePortfolioByName(name) {
-  if (Object.keys(state.portfolios).length <= 1) { toast('Cannot delete the only portfolio', 'error'); return; }
   if (!confirm(`Delete "${name}"?`)) return;
   const wasActive = name === state.activePortfolio;
   delete state.portfolios[name];
+  if (!Object.keys(state.portfolios).length) state.portfolios['My Portfolio'] = [];
   if (wasActive) { state.activePortfolio = Object.keys(state.portfolios)[0]; state.portfolio = state.portfolios[state.activePortfolio]; }
   savePortfolio(); renderPortfolioTabs(); renderPortfolio();
   toast(`Deleted "${name}"`);
