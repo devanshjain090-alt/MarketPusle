@@ -1537,7 +1537,7 @@ function renderPortfolio() {
   const pnlBigEl = $('portTotalPnlBig');
   if (pnlBigEl) { pnlBigEl.textContent = `${chgSign(totalPnlINR)}${fmtINR(Math.abs(totalPnlINR))} (${chgSign(pct)}${Math.abs(pct).toFixed(2)}%)`; pnlBigEl.className = 'pov-value ' + chgClass(totalPnlINR); }
   const usPnlCardEl = $('portUSPnlCard');
-  if (usPnlCardEl) { usPnlCardEl.textContent = `${chgSign(pnlUS)}${fmtINR(Math.abs(pnlUS * USD_TO_INR))}`; usPnlCardEl.className = 'pov-pnl-val ' + chgClass(pnlUS); }
+  if (usPnlCardEl) { usPnlCardEl.textContent = `${chgSign(pnlUS)}${fmtUSD(Math.abs(pnlUS))}`; usPnlCardEl.className = 'pov-pnl-val ' + chgClass(pnlUS); }
   const inPnlCardEl = $('portIndiaPnlCard');
   if (inPnlCardEl) { inPnlCardEl.textContent = `${chgSign(pnlIN)}${fmtINR(Math.abs(pnlIN))}`; inPnlCardEl.className = 'pov-pnl-val ' + chgClass(pnlIN); }
 
@@ -4601,6 +4601,159 @@ const XRAY_COLORS = {
 
 function _xrCol(sector) { return XRAY_COLORS[sector] || '#6b7280'; }
 
+// ── Comprehensive NSE symbol → sector map ────────────────────────────────
+const INDIA_SECTOR_MAP = {
+  // Technology / IT
+  TCS:'Technology',INFY:'Technology',WIPRO:'Technology',HCLTECH:'Technology',TECHM:'Technology',
+  LTIM:'Technology',LTIMINDTREE:'Technology',MPHASIS:'Technology',PERSISTENT:'Technology',
+  COFORGE:'Technology',KPITTECH:'Technology',TATAELXSI:'Technology',HEXAWARE:'Technology',
+  NIIT:'Technology',CYIENT:'Technology',MASTEK:'Technology',NAUKRI:'Technology',
+  MAPMYINDIA:'Technology',HAPPSTMNDS:'Technology',BIRLASOFT:'Technology',TANLA:'Technology',
+  RATEGAIN:'Technology',NEWGEN:'Technology',KELLTON:'Technology',SAKSOFT:'Technology',
+  INTELLECT:'Technology',ECLERX:'Technology',ZENSAR:'Technology',MSSL:'Technology',
+  // Finance / Banking
+  HDFCBANK:'Finance',ICICIBANK:'Finance',KOTAKBANK:'Finance',SBIN:'Finance',AXISBANK:'Finance',
+  INDUSINDBK:'Finance',FEDERALBNK:'Finance',BANDHANBNK:'Finance',IDFCFIRSTB:'Finance',
+  RBLBANK:'Finance',YESBANK:'Finance',AUBANK:'Finance',CANBK:'Finance',BANKBARODA:'Finance',
+  PNB:'Finance',UNIONBANK:'Finance',INDIANB:'Finance',IOB:'Finance',UCOBANK:'Finance',
+  CENTRALBK:'Finance',MAHABANK:'Finance',DCBBANK:'Finance',KARURVYSYA:'Finance',
+  CITYUNIONB:'Finance',EQUITASBNK:'Finance',UJJIVANSFB:'Finance',ESAFSFB:'Finance',
+  BAJFINANCE:'Finance',BAJAJFINSV:'Finance',CHOLAFIN:'Finance',MUTHOOTFIN:'Finance',
+  MANAPPURAM:'Finance',LICHSGFIN:'Finance',PNBHOUSING:'Finance',CANFINHOME:'Finance',
+  HOMEFIRST:'Finance',APTUS:'Finance',AAVAS:'Finance',REPCO:'Finance',HDFCAMC:'Finance',
+  NIPPONIND:'Finance',ICICIGI:'Finance',SBILIFE:'Finance',HDFCLIFE:'Finance',LICI:'Finance',
+  STARHEALTH:'Finance',SBICARD:'Finance',ANGELONE:'Finance',MOTILALOFS:'Finance',
+  IIFL:'Finance',NUVAMA:'Finance',BSE:'Finance',CDSL:'Finance',MCX:'Finance',
+  CREDITACC:'Finance',SPANDANA:'Finance',UGROCAP:'Finance',JMFINANCIL:'Finance',
+  PAISALO:'Finance',POONAWALLA:'Finance',FIVESTAR:'Finance',SHRIRAMFIN:'Finance',
+  LICSGFIN:'Finance',RECLTD:'Finance',PFC:'Finance',IRFC:'Finance',
+  // Energy / Power / Oil
+  RELIANCE:'Energy',ONGC:'Energy',NTPC:'Energy',POWERGRID:'Energy',COALINDIA:'Energy',
+  BPCL:'Energy',HPCL:'Energy',IOC:'Energy',GAIL:'Energy',PETRONET:'Energy',
+  MGL:'Energy',IGL:'Energy',ATGL:'Energy',GUJGASLTD:'Energy',GSPL:'Energy',
+  ADANIGREEN:'Energy',ADANIPOWER:'Energy',ADANITRANS:'Energy',TATAPOWER:'Energy',
+  TORNTPOWER:'Energy',CESC:'Energy',NHPC:'Energy',SJVN:'Energy',SUZLON:'Energy',
+  INOXWIND:'Energy',OIL:'Energy',MRPL:'Energy',CHENNPETRO:'Energy',JSWENERGY:'Energy',
+  RPOWER:'Energy',JPPOWER:'Energy',GREENKO:'Energy',ACME:'Energy',WEBSOL:'Energy',
+  // Auto & Components
+  TATAMOTORS:'Auto',MARUTI:'Auto',MM:'Auto',BAJAJAUTO:'Auto',HEROMOTOCO:'Auto',
+  EICHERMOT:'Auto',TVSMOTORS:'Auto',ASHOKLEY:'Auto',TVSMOTOR:'Auto',FORCEMOT:'Auto',
+  ESCORTS:'Auto',SONACOMS:'Auto',BHARATFORG:'Auto',MOTHERSON:'Auto',APOLLOTYRE:'Auto',
+  MRF:'Auto',BALKRISIND:'Auto',CEAT:'Auto',BOSCHLTD:'Auto',MINDAIND:'Auto',
+  ENDURANCE:'Auto',LUMAXIND:'Auto',EXIDEIND:'Auto',AMARAJABAT:'Auto',SUNDRMFAST:'Auto',
+  SUBROS:'Auto',UNOMINDA:'Auto',JTEKTINDIA:'Auto',OLECTRA:'Auto',TIINDIA:'Auto',
+  SHRIRAMCIT:'Auto',SUPRAJIT:'Auto',CRAFTSMAN:'Auto',PRICOL:'Auto',
+  // Pharma
+  SUNPHARMA:'Pharma',DRREDDY:'Pharma',CIPLA:'Pharma',DIVISLAB:'Pharma',LUPIN:'Pharma',
+  AUROPHARMA:'Pharma',TORNTPHARM:'Pharma',ALKEM:'Pharma',IPCA:'Pharma',
+  NATCOPHARM:'Pharma',GLENMARK:'Pharma',BIOCON:'Pharma',ABBOTINDIA:'Pharma',
+  AJANTPHARM:'Pharma',LAURUSLABS:'Pharma',GRANULES:'Pharma',GLAND:'Pharma',
+  ERIS:'Pharma',JBCHEPHARM:'Pharma',CAPLIPOINT:'Pharma',SEQUENT:'Pharma',
+  NEULANDLAB:'Pharma',SYNGENE:'Pharma',SOLARA:'Pharma',STRIDES:'Pharma',
+  WINDLAS:'Pharma',BLISSGVS:'Pharma',VALIANT:'Pharma',MARKSANS:'Pharma',
+  // Healthcare
+  APOLLOHOSP:'Healthcare',FORTIS:'Healthcare',MAXHEALTH:'Healthcare',KIMS:'Healthcare',
+  NARAYANHRU:'Healthcare',METROPOLIS:'Healthcare',LALPATHLAB:'Healthcare',
+  THYROCARE:'Healthcare',DRPATH:'Healthcare',VIJAYA:'Healthcare',MEDANTA:'Healthcare',
+  HCG:'Healthcare',RAINBOW:'Healthcare',ASTER:'Healthcare',YATHARTH:'Healthcare',
+  // FMCG
+  HINDUNILVR:'FMCG',ITC:'FMCG',NESTLEIND:'FMCG',BRITANNIA:'FMCG',DABUR:'FMCG',
+  GODREJCP:'FMCG',MARICO:'FMCG',COLPAL:'FMCG',EMAMILTD:'FMCG',BAJAJCON:'FMCG',
+  HATSUN:'FMCG',JYOTHYLAB:'FMCG',ZYDUSWELL:'FMCG',TATACONSUM:'FMCG',VBL:'FMCG',
+  RADICO:'FMCG',USL:'FMCG',BIKAJI:'FMCG',DODLA:'FMCG',PATANJALI:'FMCG',
+  HERITAGE:'FMCG',CCL:'FMCG',GLOBUSSPR:'FMCG',TASTY:'FMCG',
+  // Consumer / Retail / Lifestyle
+  TITAN:'Consumer',DMART:'Retail',TRENT:'Retail',ABFRL:'Retail',MANYAVAR:'Retail',
+  SHOPERSTOP:'Retail',VMART:'Retail',PVR:'Consumer',INOXLEISUR:'Consumer',
+  ZEEL:'Consumer',SUNTV:'Consumer',NETWORK18:'Consumer',TV18BRDCST:'Consumer',
+  SAREGAMA:'Consumer',ZOMATO:'Consumer',SWIGGY:'Consumer',NYKAA:'Consumer',
+  FSNERETAIL:'Retail',RAJESHEXPO:'Consumer',KALYANKJIL:'Consumer',
+  SENCO:'Consumer',THANGAMAYL:'Consumer',BATA:'Consumer',RELAXO:'Consumer',
+  LIMEROAD:'Consumer',VEDANT:'Retail',
+  // Metal / Mining
+  TATASTEEL:'Metal',JSWSTEEL:'Metal',HINDALCO:'Metal',VEDL:'Metal',VEDANTA:'Metal',
+  SAIL:'Metal',NMDC:'Metal',NATIONALUM:'Metal',HINDZINC:'Metal',MOIL:'Metal',
+  APLAPOLLO:'Metal',WELCORP:'Metal',RATNAMANI:'Metal',JINDALSTEL:'Metal',
+  JINDALSAW:'Metal',KALYANIFRG:'Metal',ELECTCAST:'Metal',NALCO:'Metal',
+  SAHAMITR:'Metal',GRAVITA:'Metal',HINDUSTAN ZINC:'Metal',
+  // Cement
+  ULTRACEMCO:'Cement',SHREECEM:'Cement',AMBUJACEM:'Cement',ACC:'Cement',
+  DALMIA:'Cement',RAMCOCEM:'Cement',JKCEMENT:'Cement',HEIDELBERG:'Cement',
+  BIRLACORPN:'Cement',PRISMCEMENT:'Cement',NUVOCO:'Cement',JKLAKSHMI:'Cement',
+  SANGHIBLDER:'Cement',STAR:'Cement',KESORAMIND:'Cement',
+  // Infrastructure / Industrial / Capital Goods
+  LT:'Infrastructure',ADANIPORTS:'Infrastructure',CONCOR:'Infrastructure',
+  IRCTC:'Infrastructure',RITES:'Infrastructure',IRCON:'Infrastructure',
+  NBCC:'Infrastructure',BEL:'Defence',HAL:'Defence',BHEL:'Industrial',
+  SIEMENS:'Industrial',ABB:'Industrial',CUMMINSIND:'Industrial',THERMAX:'Industrial',
+  HAVELLS:'Industrial',POLYCAB:'Industrial',KEI:'Industrial',FINOLEXCAB:'Industrial',
+  VGUARD:'Industrial',BLUESTAR:'Industrial',VOLTAS:'Industrial',
+  CROMPTON:'Industrial',DIXON:'Industrial',KAYNES:'Industrial',AMBER:'Industrial',
+  TIMKEN:'Industrial',SKFINDIA:'Industrial',NCC:'Infrastructure',PNCINFRA:'Infrastructure',
+  KNR:'Infrastructure',HGINFRA:'Infrastructure',AHLUWALIA:'Infrastructure',
+  GRINFRA:'Infrastructure',ADANIINFRA:'Infrastructure',GMRINFRA:'Infrastructure',
+  // Chemical / Paint
+  PIDILITIND:'Chemical',ASIANPAINT:'Chemical',BERGERPAINTS:'Chemical',
+  AKZOINDIA:'Chemical',KANSAINER:'Chemical',INDIGOPNTS:'Chemical',
+  TATACHEM:'Chemical',DEEPAKNTR:'Chemical',AARTI:'Chemical',NAVINFLUOR:'Chemical',
+  SRF:'Chemical',VINATI:'Chemical',FINEORG:'Chemical',GALAXYSURF:'Chemical',
+  ANUPAM:'Chemical',ATUL:'Chemical',NOCIL:'Chemical',GHCL:'Chemical',
+  AARTIDRUGS:'Chemical',ROSSARI:'Chemical',CLEAN:'Chemical',CAMLIN:'Chemical',
+  // Plastic / Pipes
+  SUPREMEIND:'Industrial',ASTRAL:'Industrial',FINOLEXIND:'Industrial',
+  PRINCEPIPE:'Industrial',KPPL:'Industrial',NILKAMAL:'Industrial',
+  // Telecom
+  BHARTIARTL:'Telecom',IDEA:'Telecom',TATACOMM:'Telecom',RAILTEL:'Telecom',
+  STLTECH:'Telecom',HFCL:'Telecom',TEJAS:'Telecom',VINDHYATEL:'Telecom',
+  // Real Estate
+  DLF:'Real Estate',GODREJPROP:'Real Estate',PRESTIGE:'Real Estate',
+  BRIGADE:'Real Estate',SOBHA:'Real Estate',PHOENIXLTD:'Real Estate',
+  OBEROIRLTY:'Real Estate',SUNTEK:'Real Estate',KOLTEPATIL:'Real Estate',
+  MAHLIFE:'Real Estate',LODHA:'Real Estate',MACROTECH:'Real Estate',
+  SIGNATURE:'Real Estate',ANANT:'Real Estate',ASHIANA:'Real Estate',
+  // Logistics
+  DELHIVERY:'Logistics',GATI:'Logistics',ALLCARGO:'Logistics',BLUEDART:'Logistics',
+  TCI:'Logistics',VRL:'Logistics',MAHLOG:'Logistics',SPXO:'Logistics',
+  // Agri / Fertiliser
+  UPL:'Agri',PIIND:'Agri',RALLIS:'Agri',GODREJAGRO:'Agri',SUMICHEM:'Agri',
+  KRBL:'Agri',LTFOODS:'Agri',AVANTIFEED:'Agri',WATERBASE:'Agri',
+  COROMANDEL:'Agri',CHAMBAL:'Agri',KSCL:'Agri',INSECTICID:'Agri',
+  // Textile
+  PAGEIND:'Textile',TRIDENT:'Textile',HIMATSEIDE:'Textile',VARDHMAN:'Textile',
+  RAYMOND:'Textile',ARVIND:'Textile',WELSPUNIND:'Textile',GARWARE:'Textile',
+  KTIL:'Textile',GOKEX:'Textile',NITIN:'Textile',
+  // Fintech / New-age
+  PAYTM:'Finance',POLICYBZR:'Technology',DELHIVERY:'Logistics',
+};
+
+// Keyword-based sector inference — fallback when symbol not in map
+function resolveIndiaSector(symbol, name) {
+  const s = (symbol || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (INDIA_SECTOR_MAP[s]) return INDIA_SECTOR_MAP[s];
+  const t = `${s} ${(name || '').toUpperCase()}`;
+  if (/BANK|BANCORP|BANQUE/.test(t))                                      return 'Finance';
+  if (/FINANCE|CAPITAL|FINSERV|CREDIT|LENDING|LEASING|INVEST|FINCORP/.test(t)) return 'Finance';
+  if (/INSURANCE|LIFE INS|GENERAL INS/.test(t))                           return 'Finance';
+  if (/PHARMA|LABORATORIES|LABS|DRUG|BIOCON|BIOLOGICS/.test(t))           return 'Pharma';
+  if (/HOSPITAL|HEALTHCARE|MEDIC|CLINIC|DIAGNOST|PATHOLOG/.test(t))       return 'Healthcare';
+  if (/INFOTECH|SOFTWARE|DIGITAL|SYSTEMS|TECHNOLOGY|COMPUTERS|SOLUTION/.test(t)) return 'Technology';
+  if (/MOTOR|AUTOMOBILE|AUTO|TYRE|VEHICLE|WHEEL/.test(t))                 return 'Auto';
+  if (/STEEL|METAL|ALUMIN|COPPER|ZINC|IRON|FERRO|ALLOY/.test(t))          return 'Metal';
+  if (/CEMENT|CONCR/.test(t))                                             return 'Cement';
+  if (/OIL|GAS|PETROL|REFIN|PETROLEUM|POWER|ELECTRIC|ENERGY|SOLAR|WIND|HYDRO|THERMAL|COAL/.test(t)) return 'Energy';
+  if (/TELECOM|COMMUNICATION|WIRELESS|CELLULAR/.test(t))                  return 'Telecom';
+  if (/REAL ESTATE|REALTY|HOUSING|PROPERTIES|DEVELOPER/.test(t))          return 'Real Estate';
+  if (/PAINT|CHEMICAL|POLYMER|RESIN|COATING/.test(t))                     return 'Chemical';
+  if (/FMCG|FOODS|BEVERAGE|DAIRY|CONSUMER GOOD/.test(t))                  return 'FMCG';
+  if (/RETAIL|MART|FASHION|APPAREL|CLOTH/.test(t))                        return 'Retail';
+  if (/TEXTILE|FIBER|YARN|FABRIC|SPINNING/.test(t))                       return 'Textile';
+  if (/AGRI|FERTILIZ|PESTICIDE|SEED|FARM|CROP/.test(t))                   return 'Agri';
+  if (/LOGISTIC|TRANSPORT|FREIGHT|COURIER|CARGO|SHIPPING/.test(t))        return 'Logistics';
+  if (/DEFENCE|DEFENSE|AEROSPACE|AVIATION|AIRLINE/.test(t))               return 'Defence';
+  if (/INFRA|ENGINEER|CONSTRUCT|PROJECT|EPC/.test(t))                     return 'Infrastructure';
+  return 'Other';
+}
+
 function initXRay() { buildXRaySelector(); runXRay(); }
 
 function buildXRaySelector() {
@@ -4644,7 +4797,7 @@ function runXRay() {
   emptyEl.style.display = 'none';
 
   // Assign current values
-  const enriched = holdings.map(h => ({ ...h, cv: ((h.ltp || h.buyPrice || 0) * (h.qty || 0)) }));
+  const enriched = holdings.map(h => ({ ...h, cv: ((h.currentPrice || h.buyPrice || 0) * (h.qty || 0)) }));
   const totalVal  = enriched.reduce((s, h) => s + h.cv, 0) || 1;
 
   const sectorMap = {}; // sector -> { direct, etf }
@@ -4675,11 +4828,13 @@ function runXRay() {
         sectorMap['Other'].etf += otherW;
       }
     } else {
-      const sector = h.sector || 'Other';
+      const sector = (h.sector && h.sector !== 'Other' && h.sector !== '—')
+        ? h.sector
+        : (h.market === 'india' ? resolveIndiaSector(sym, h.name) : (h.sector || 'Other'));
       const dp = wt * 100;
       if (!sectorMap[sector]) sectorMap[sector] = { direct: 0, etf: 0 };
       sectorMap[sector].direct += dp;
-      if (!stockMap[sym]) stockMap[sym] = { name: h.company || sym, sector, direct: 0, etfContrib: {} };
+      if (!stockMap[sym]) stockMap[sym] = { name: h.name || sym, sector, direct: 0, etfContrib: {} };
       stockMap[sym].direct += dp;
     }
   });
