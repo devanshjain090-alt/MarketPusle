@@ -3173,82 +3173,135 @@ function guessIndiaSymbol(rawName) {
   return { symbol: sym, name: rawName, sector: '' };
 }
 
+// Keyword-based column detection fallback (used if AI is unavailable)
+function _detectImportColsFallback(allRows) {
+  let headerIdx = 0;
+  for (let i = 0; i < Math.min(6, allRows.length); i++) {
+    const textCells = allRows[i].filter(c => c && isNaN(c) && String(c).length > 1).length;
+    if (textCells >= 3) { headerIdx = i; break; }
+  }
+  const hdrs = allRows[headerIdx].map(h => String(h).toLowerCase().trim());
+  const find = (...pats) => { for (const p of pats) { const i = hdrs.findIndex(h => p.test(h)); if (i >= 0) return i; } return null; };
+  return {
+    header_row:    headerIdx,
+    symbol_or_name: find(/^symbol$/, /^ticker$/, /^scrip$/, /instrument/, /stock.?name/, /scrip.?name/, /^name$/, /^company/, /^stock$/),
+    quantity:       find(/^qty\.?$/, /^quantity$/, /net.?qty/, /balance.?qty/, /holdings.?qty/, /shares/),
+    avg_price:      find(/avg.?cost/, /avg.?price/, /average.?price/, /average.?cost/, /buy.?price/, /purchase.?price/, /cost.?price/),
+    current_price:  find(/^ltp$/, /^cmp$/, /current.?price/, /market.?price/, /last.?price/, /closing.?price/)
+  };
+}
+
 function handleImportFile(input) {
   const file = input.files[0];
   if (!file) return;
   const ext = file.name.split('.').pop().toLowerCase();
-  const reader = new FileReader();
 
-  reader.onload = function(e) {
-    let rawRows = [], hdrs = [];
+  // Show loading state immediately
+  $('importDropzone').classList.add('has-file');
+  $('importPreviewSection').style.display = '';
+  $('importPreviewBody').innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text3)"><i class="fa-solid fa-circle-notch fa-spin" style="margin-right:8px"></i>Analysing file with AI…</td></tr>`;
+  $('importValidCount').textContent = 'Detecting columns…';
+  $('importConfirmBtn').style.display = 'none';
+
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    let allRows = [];
     try {
       if (ext === 'csv') {
         const lines = (e.target.result).split('\n').filter(l => l.trim());
-        if (lines.length < 2) { toast('File appears empty', 'error'); return; }
-        hdrs = lines[0].split(',').map(h => h.replace(/"/g,'').trim().toLowerCase());
-        rawRows = lines.slice(1).map(line => {
-          const vals = line.split(',').map(v => v.replace(/^"|"$/g,'').trim());
-          const obj = {}; hdrs.forEach((h, i) => { obj[h] = vals[i] || ''; }); return obj;
-        });
+        allRows = lines.map(line => line.split(',').map(v => v.replace(/^"|"$/g,'').trim()));
       } else {
         const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-        if (raw.length < 2) { toast('File appears empty', 'error'); return; }
-        hdrs = raw[0].map(h => String(h).trim().toLowerCase());
-        rawRows = raw.slice(1)
-          .filter(r => r.some(c => c !== '' && c !== undefined))
-          .map(row => { const obj = {}; hdrs.forEach((h, i) => { obj[h] = row[i] !== undefined ? String(row[i]).trim() : ''; }); return obj; });
+        allRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+          .map(row => row.map(c => String(c).trim()));
       }
     } catch { toast('Could not read file — check the format', 'error'); return; }
 
-    const get = (obj, ...keys) => { for (const k of keys) if (obj[k] !== undefined && obj[k] !== '') return String(obj[k]); return ''; };
+    allRows = allRows.filter(r => r.some(c => c !== '' && c !== undefined));
+    if (allRows.length < 2) { toast('File appears empty', 'error'); return; }
 
-    // Detect if file has an explicit symbol column and/or market column
-    const hasSymbolCol = hdrs.some(h => h === 'symbol' || h === 'ticker' || h === 'scrip' || h === 'scrip name');
-    const hasMarketCol = hdrs.some(h => h === 'market' || h === 'exchange');
-    // If no market column, default to india (broker statements are typically Indian)
-    const defaultMarket = hasMarketCol ? null : 'india';
+    // Send first 5 rows to Gemini to identify columns — no assumptions about header names
+    const sample = allRows.slice(0, Math.min(5, allRows.length));
+    const prompt = `You are parsing a stock brokerage portfolio export file. Here are the first few rows as a JSON array of arrays:
+${JSON.stringify(sample)}
 
-    _importRows = rawRows.map(r => {
-      // Company name — accept "stock name", "scrip name", "name", "company" etc.
-      const rawCompanyName = get(r, 'stock name', 'scrip name', 'scrip', 'company name', 'company', 'name', 'stock');
+Identify (using 0-based indices):
+1. header_row: which row index is the column header row?
+2. symbol_or_name: column index containing the stock ticker symbol OR company name
+3. quantity: column index containing shares/units held (net quantity)
+4. avg_price: column index containing average purchase price / cost per share
+5. current_price: column index for current market price / LTP (null if absent)
 
-      // Symbol resolution
-      let symbol = '', name = rawCompanyName, sector = '', symbolGuessed = false;
-      if (hasSymbolCol) {
-        symbol = get(r, 'symbol', 'ticker', 'scrip')
-          .toUpperCase()
-          .replace(/\s+/g, '')
-          .replace(/^(NSE:|BSE:)/, '')
-          .replace(/\.(NS|BO)$/, '');
-      } else if (rawCompanyName) {
-        const resolved = guessIndiaSymbol(rawCompanyName);
-        symbol  = resolved.symbol;
-        name    = resolved.name || rawCompanyName;
-        sector  = resolved.sector;
-        symbolGuessed = true;
+Reply with ONLY raw JSON, no markdown, no explanation:
+{"header_row":0,"symbol_or_name":0,"quantity":1,"avg_price":2,"current_price":null}`;
+
+    let colMap = null;
+    try {
+      const res = await fetch(PROXY_BASE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0, maxOutputTokens: 100 }
+        })
+      });
+      if (res.ok) {
+        const d = await res.json();
+        const text = ((d.candidates?.[0]?.content?.parts || []).map(p => p.text||'').join('') || d.reply || d.text || '').trim();
+        const match = text.match(/\{[^{}]*\}/);
+        if (match) colMap = JSON.parse(match[0]);
       }
+    } catch(e) { console.warn('AI column detection failed, using fallback:', e); }
 
-      // Market
-      let market = defaultMarket;
-      if (!market) {
-        const mktRaw = get(r, 'market', 'exchange').toLowerCase();
-        market = (mktRaw.includes('india') || mktRaw === 'nse' || mktRaw === 'bse') ? 'india' : 'us';
-      }
+    // Fallback: keyword regex on header row
+    if (!colMap || colMap.symbol_or_name == null) {
+      colMap = _detectImportColsFallback(allRows);
+    }
 
-      // Numeric fields — many aliases for broker file formats
-      const qty          = parseFloat(get(r,'qty','quantity','shares','net qty','net quantity','balance qty','holdings qty'));
-      const buyPrice     = parseFloat(get(r,'buy price','buyprice','buy_price','average buy price','avg buy price','avg price','average price','purchase price','cost price'));
-      const currentPrice = parseFloat(get(r,'current price','ltp','cmp','market price','last price','closing price','curr. price','mkt price','present value price'));
-      const sectorFld    = get(r, 'sector', 'industry') || sector;
-      const date         = get(r, 'date', 'buy date', 'buydate', 'purchase date', 'trade date');
+    if (!colMap || colMap.symbol_or_name == null || colMap.quantity == null || colMap.avg_price == null) {
+      $('importValidCount').textContent = 'Could not detect columns';
+      $('importPreviewBody').innerHTML = `<tr><td colspan="7" class="empty-td" style="color:var(--red)">Could not identify Symbol, Quantity, and Avg Price columns in this file. Please use the Import Template format.</td></tr>`;
+      return;
+    }
 
-      return { symbol, name: name || symbol, market, qty, buyPrice, currentPrice,
-               sector: sectorFld, date, symbolGuessed, valid: !!symbol && qty > 0 && buyPrice > 0 };
-    }).filter(r => r.symbol);
+    const headerRowIdx = colMap.header_row ?? 0;
+    const cSym = colMap.symbol_or_name;
+    const cQty = colMap.quantity;
+    const cAvg = colMap.avg_price;
+    const cLTP = colMap.current_price ?? null;
 
-    $('importDropzone').classList.add('has-file');
+    const stripNum  = v => parseFloat(String(v ?? '').replace(/[^0-9.-]/g, ''));
+    const isSymbol  = v => /^[A-Z0-9&.\-]{1,15}$/.test((v||'').toUpperCase().replace(/\s/g,''));
+
+    _importRows = allRows.slice(headerRowIdx + 1)
+      .filter(r => r[cSym] && String(r[cSym]).trim() !== '')
+      .map(r => {
+        const rawVal   = String(r[cSym] || '').trim();
+        const qty      = stripNum(r[cQty]);
+        const buyPrice = stripNum(r[cAvg]);
+        const curPrice = cLTP != null ? stripNum(r[cLTP]) : NaN;
+
+        let symbol, name, sector = '', symbolGuessed = false;
+        const cleaned = rawVal.toUpperCase().replace(/\.(NS|BO)$/i,'').replace(/^(NSE:|BSE:)/i,'').replace(/\s+/g,'');
+
+        if (isSymbol(cleaned)) {
+          symbol = cleaned; name = cleaned;
+        } else {
+          const resolved = guessIndiaSymbol(rawVal);
+          symbol = resolved.symbol; name = resolved.name || rawVal; sector = resolved.sector;
+          symbolGuessed = true;
+        }
+
+        return {
+          symbol, name: name || symbol, market: 'india',
+          qty, buyPrice, currentPrice: curPrice,
+          sector, date: '', symbolGuessed,
+          valid: !!symbol && qty > 0 && buyPrice > 0
+        };
+      })
+      .filter(r => r.symbol);
+
     renderImportPreview();
   };
 
