@@ -1681,90 +1681,129 @@ async function fetchLivePrices() {
       }
     }
 
-    // ── India: Gemini AI with Google Search ──────────────────────────────
+    // ── India: Yahoo Finance batch → Yahoo v8 per-symbol → Gemini AI ────
     const indiaHoldings = state.portfolio.filter(h => h.market === 'india');
     if (indiaHoldings.length) {
-      if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Asking Gemini…';
+      if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Fetching India prices…';
 
-      const stockList = indiaHoldings.map(h => `${h.symbol} (${h.name})`).join(', ');
-      const prompt = `Search Google right now and find the latest NSE closing prices for these Indian stocks: ${stockList}.
+      const indiaSymbols = indiaHoldings.map(h =>
+        h.symbol.toUpperCase().replace(/\.NS$|\.BO$/g, '').replace(/^NSE:|^BSE:/g, '')
+      );
+      const indiaUpdated = new Set();
 
-Return ONLY a raw JSON object like this, no markdown, no explanation:
-{"RELIANCE": 1321.9, "TCS": 2256.0, "TATAMOTORS": 652.3}
-
-Use the stock symbol as the key. If a stock is not found on NSE, skip it. Search each one on Google Finance or NSE India.`;
-
-      const geminiContents = [{ role: 'user', parts: [{ text: prompt }] }];
-      const geminiTools = [{ google_search: {} }];
-      const geminiConfig = { temperature: 0, maxOutputTokens: 2000 };
-
-      // Prefer user's own key (direct call); fall back to Vercel proxy (server key)
-      const userKey = _geminiKey();
-      let responseText = null;
-
-      try {
-        let res;
-        if (userKey) {
-          res = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${userKey}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ contents: geminiContents, tools: geminiTools, generationConfig: geminiConfig })
-            }
-          );
-          if (res.ok) {
-            const data = await res.json();
-            responseText = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+      // Helper: apply a price result map {SYMBOL: {price, chg, chgPct}} to holdings
+      function _applyIndiaPrices(priceMap) {
+        indiaHoldings.forEach(h => {
+          const sym = h.symbol.toUpperCase().replace(/\.NS$|\.BO$/g, '').replace(/^NSE:|^BSE:/g, '');
+          const d = priceMap[sym];
+          if (d?.price > 0 && !indiaUpdated.has(sym)) {
+            h.currentPrice = d.price;
+            h.dayChgPct = d.chgPct ?? 0;
+            patchIndiaDB(sym, d.price, d.chg ?? 0, d.chgPct ?? 0);
+            indiaUpdated.add(sym);
+            updated++;
           }
-        }
-
-        // Fallback: route through Vercel proxy (uses server-side GEMINI_KEY)
-        if (!responseText) {
-          res = await fetch(PROXY_BASE, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: geminiContents, tools: geminiTools, generationConfig: geminiConfig })
-          });
-          if (res.ok) {
-            const data = await res.json();
-            responseText = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('')
-              || data.reply || data.text || '';
-          }
-        }
-
-        if (responseText) {
-          const match = responseText.match(/\{[\s\S]*\}/);
-          if (match) {
-            const prices = JSON.parse(match[0]);
-            indiaHoldings.forEach(h => {
-              const sym = h.symbol.toUpperCase()
-                .replace(/\.NS$|\.BO$/g, '')
-                .replace(/^NSE:|^BSE:/g, '');
-              const price = prices[sym] || prices[h.symbol];
-              if (price > 0) {
-                const prev = h.currentPrice || h.buyPrice;
-                const change = price - prev;
-                const changePct = prev > 0 ? (change / prev) * 100 : 0;
-                h.currentPrice = price;
-                patchIndiaDB(h.symbol, price, change, changePct);
-                updated++;
-              } else {
-                failed.push(h.symbol);
-              }
-            });
-          } else {
-            indiaHoldings.forEach(h => failed.push(h.symbol));
-            toast('Gemini returned unexpected format', 'error');
-          }
-        } else {
-          indiaHoldings.forEach(h => failed.push(h.symbol));
-          toast('Gemini price fetch failed', 'error');
-        }
-      } catch(e) {
-        indiaHoldings.forEach(h => failed.push(h.symbol));
-        toast('Gemini error: ' + e.message, 'error');
+        });
       }
+
+      // Tier 1: Yahoo Finance v7 batch via CORS proxies (allorigins → corsproxy.io)
+      try {
+        const yahooData = await fetchYahooNSProxy(indiaSymbols);
+        if (Object.keys(yahooData).length) _applyIndiaPrices(yahooData);
+      } catch(e) { console.warn('Yahoo NSProxy error:', e); }
+
+      // Tier 2: Yahoo Finance v8 chart per-symbol for anything still missing
+      const stillMissing = indiaSymbols.filter(s => !indiaUpdated.has(s));
+      if (stillMissing.length) {
+        if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Fetching India prices…';
+        try {
+          const chartData = await fetchYahooChartIndia(stillMissing);
+          if (Object.keys(chartData).length) _applyIndiaPrices(chartData);
+        } catch(e) { console.warn('Yahoo chart error:', e); }
+      }
+
+      // Tier 3: Gemini AI with Google Search for anything still missing
+      const stillMissing2 = indiaSymbols.filter(s => !indiaUpdated.has(s));
+      if (stillMissing2.length) {
+        if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Asking Gemini…';
+        const missingHoldings = indiaHoldings.filter(h => {
+          const sym = h.symbol.toUpperCase().replace(/\.NS$|\.BO$/g, '').replace(/^NSE:|^BSE:/g, '');
+          return !indiaUpdated.has(sym);
+        });
+        const stockList = missingHoldings.map(h => `${h.symbol} (${h.name})`).join(', ');
+        const prompt = `Find the latest NSE stock prices for: ${stockList}.
+Reply with ONLY a raw JSON object, no markdown, no extra text:
+{"RELIANCE": 2850.50, "TCS": 3421.00}
+Use the plain NSE symbol as key. Skip any stock you cannot find.`;
+
+        try {
+          let responseText = null;
+
+          // Try user key first, then Vercel proxy
+          const userKey = _geminiKey();
+          if (userKey) {
+            const res = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${userKey}`,
+              { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                  tools: [{ google_search: {} }],
+                  generationConfig: { temperature: 0, maxOutputTokens: 1000 }
+                }) }
+            );
+            if (res.ok) {
+              const d = await res.json();
+              responseText = (d.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+            }
+          }
+          if (!responseText) {
+            const res = await fetch(PROXY_BASE, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                tools: [{ google_search: {} }],
+                generationConfig: { temperature: 0, maxOutputTokens: 1000 }
+              })
+            });
+            if (res.ok) {
+              const d = await res.json();
+              responseText = (d.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('')
+                || d.reply || d.text || '';
+            }
+          }
+
+          if (responseText) {
+            // Extract only the first {...} block (avoid grounding metadata)
+            const match = responseText.match(/\{[^{}]*\}/);
+            if (match) {
+              try {
+                const prices = JSON.parse(match[0]);
+                missingHoldings.forEach(h => {
+                  const sym = h.symbol.toUpperCase().replace(/\.NS$|\.BO$/g, '').replace(/^NSE:|^BSE:/g, '');
+                  const price = parseFloat(prices[sym] || prices[h.symbol]);
+                  if (price > 0) {
+                    const prev = h.currentPrice || h.buyPrice;
+                    h.currentPrice = price;
+                    h.dayChgPct = prev > 0 ? ((price - prev) / prev) * 100 : 0;
+                    patchIndiaDB(sym, price, price - prev, h.dayChgPct);
+                    indiaUpdated.add(sym);
+                    updated++;
+                  } else { failed.push(h.symbol); }
+                });
+              } catch(e) { missingHoldings.forEach(h => failed.push(h.symbol)); }
+            } else { missingHoldings.forEach(h => failed.push(h.symbol)); }
+          } else { missingHoldings.forEach(h => failed.push(h.symbol)); }
+        } catch(e) {
+          missingHoldings.forEach(h => failed.push(h.symbol));
+          console.warn('Gemini price error:', e);
+        }
+      }
+
+      // Anything never resolved
+      indiaHoldings.forEach(h => {
+        const sym = h.symbol.toUpperCase().replace(/\.NS$|\.BO$/g, '').replace(/^NSE:|^BSE:/g, '');
+        if (!indiaUpdated.has(sym) && !failed.includes(h.symbol)) failed.push(h.symbol);
+      });
     }
 
     savePortfolio();
