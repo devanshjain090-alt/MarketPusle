@@ -1169,7 +1169,8 @@ body.sidebar-rail .nav-item[data-label]:hover::after {
 .method-item p { font-family: var(--mono); font-size: 11px; color: var(--text3); line-height: 1.6; }
 
 /* ============================= IMPORT MODAL ============================= */
-.import-modal-box { width: min(720px, 96vw); }
+.import-modal-box { width: min(720px, 96vw); max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+.import-modal-box .modal-body { flex: 1; overflow-y: auto; }
 .import-dropzone { border: 1px dashed var(--border); border-radius: 2px; padding: 28px 20px; text-align: center; cursor: pointer; transition: var(--transition); user-select: none; }
 .import-dropzone:hover, .import-dropzone.dragover { border-color: var(--gold); background: var(--gold-dim); }
 .import-dropzone.has-file { border-color: rgba(74,222,128,0.4); background: rgba(74,222,128,0.04); }
