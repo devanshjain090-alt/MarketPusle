@@ -4675,7 +4675,7 @@ const INDIA_SECTOR_MAP = {
   SAIL:'Metal',NMDC:'Metal',NATIONALUM:'Metal',HINDZINC:'Metal',MOIL:'Metal',
   APLAPOLLO:'Metal',WELCORP:'Metal',RATNAMANI:'Metal',JINDALSTEL:'Metal',
   JINDALSAW:'Metal',KALYANIFRG:'Metal',ELECTCAST:'Metal',NALCO:'Metal',
-  SAHAMITR:'Metal',GRAVITA:'Metal',HINDUSTAN ZINC:'Metal',
+  SAHAMITR:'Metal',GRAVITA:'Metal',HINDZINC:'Metal',
   // Cement
   ULTRACEMCO:'Cement',SHREECEM:'Cement',AMBUJACEM:'Cement',ACC:'Cement',
   DALMIA:'Cement',RAMCOCEM:'Cement',JKCEMENT:'Cement',HEIDELBERG:'Cement',
