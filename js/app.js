@@ -2988,12 +2988,15 @@ function _initTVScreener(mkt) {
   if (!container) return;
 
   const market = mkt === 'us' ? 'america' : 'india';
-  const availH = Math.max(550, window.innerHeight - 180);
+  const availH = Math.max(600, window.innerHeight - 160);
 
   const wrap = document.createElement('div');
   wrap.className = 'tradingview-widget-container';
+  wrap.style.cssText = `width:100%;height:${availH}px;`;
+
   const inner = document.createElement('div');
   inner.className = 'tradingview-widget-container__widget';
+  inner.style.cssText = 'width:100%;height:100%;';
   wrap.appendChild(inner);
 
   const script = document.createElement('script');

@@ -902,6 +902,13 @@ body.sidebar-rail .nav-item[data-label]:hover::after {
 .smtab.active { background: var(--gold); color: #0a0a0e; border-color: var(--gold); }
 .smtab[data-smkt="india"].active { background: var(--india); border-color: var(--india); }
 
+/* TradingView screener widget containers */
+#tv-screener-us,
+#tv-screener-india { width: 100%; overflow: hidden; }
+.tradingview-widget-container { width: 100% !important; display: block; }
+.tradingview-widget-container__widget { width: 100% !important; display: block; }
+.tradingview-widget-container iframe { display: block; width: 100% !important; border: none; }
+
 .screener-filters-card { padding: 16px; }
 .screener-search-row { display: flex; align-items: flex-end; gap: 12px; margin-bottom: 14px; }
 .screener-search-wrap { flex: 1; position: relative; }
