@@ -929,9 +929,44 @@
     <!-- Feed Table -->
     <div class="card">
       <div class="card-header">
-        <h3>Live Deal Feed</h3>
-        <span class="sm-feed-count" id="smFeedCount">—</span>
+        <h3 id="smFeedTitle">Live Deal Feed</h3>
+        <div class="sm-feed-header-right">
+          <div class="sm-history-wrap">
+            <i class="fa-solid fa-magnifying-glass sm-history-icon"></i>
+            <input type="text" id="smHistorySearch" class="sm-history-input"
+              placeholder="Search company or institution…"
+              oninput="setSmHistory(this.value)" autocomplete="off">
+            <button class="sm-history-clear" id="smHistoryClear" style="display:none"
+              onclick="clearSmHistory()" title="Clear search">×</button>
+          </div>
+          <span class="sm-feed-count" id="smFeedCount">—</span>
+        </div>
       </div>
+
+      <!-- Per-entity/company summary — shown when history search is active -->
+      <div class="sm-history-summary" id="smHistorySummary" style="display:none">
+        <div class="sm-hs-item buy">
+          <span class="sm-hs-label">Total Bought</span>
+          <span class="sm-hs-val" id="smHsBuy">—</span>
+          <span class="sm-hs-sub" id="smHsBuyN">0 txns</span>
+        </div>
+        <div class="sm-hs-item sell">
+          <span class="sm-hs-label">Total Sold</span>
+          <span class="sm-hs-val" id="smHsSell">—</span>
+          <span class="sm-hs-sub" id="smHsSellN">0 txns</span>
+        </div>
+        <div class="sm-hs-item net">
+          <span class="sm-hs-label">Net Position</span>
+          <span class="sm-hs-val" id="smHsNet">—</span>
+          <span class="sm-hs-sub" id="smHsNetLbl">—</span>
+        </div>
+        <div class="sm-hs-item">
+          <span class="sm-hs-label">Deals Found</span>
+          <span class="sm-hs-val" id="smHsCount">—</span>
+          <span class="sm-hs-sub">in current feed</span>
+        </div>
+      </div>
+
       <div class="table-wrap">
         <table class="data-table">
           <thead>

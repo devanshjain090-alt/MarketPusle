@@ -5003,6 +5003,7 @@ function _renderXRay({ holdings, etfs, sectorRisks, topStocks, overlaps }) {
 const smartMoney = {
   deals: [],
   filters: { market: 'all', type: 'all', side: 'all' },
+  historySearch: '',
   interval: null,
   initialized: false
 };
@@ -5133,6 +5134,30 @@ function _smFmtStat(totalVal, marketFilter) {
   return cr >= 1000 ? '₹' + (cr/1000).toFixed(1) + 'K Cr' : '₹' + cr.toFixed(0) + ' Cr';
 }
 
+function setSmHistory(query) {
+  smartMoney.historySearch = (query || '').trim();
+  const clearBtn = document.getElementById('smHistoryClear');
+  if (clearBtn) clearBtn.style.display = smartMoney.historySearch ? 'flex' : 'none';
+  renderSmartMoney();
+}
+
+function clearSmHistory() {
+  smartMoney.historySearch = '';
+  const inp = document.getElementById('smHistorySearch');
+  if (inp) inp.value = '';
+  const clearBtn = document.getElementById('smHistoryClear');
+  if (clearBtn) clearBtn.style.display = 'none';
+  renderSmartMoney();
+}
+
+function smDrillDown(query) {
+  const inp = document.getElementById('smHistorySearch');
+  if (inp) inp.value = query;
+  setSmHistory(query);
+  // Scroll to the summary strip
+  document.getElementById('smHistorySummary')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 function initSmartMoney() {
   if (!smartMoney.initialized) {
     const batch = [];
@@ -5164,9 +5189,10 @@ function refreshSmartMoney(manual) {
 }
 
 function renderSmartMoney() {
-  const { filters, deals } = smartMoney;
+  const { filters, deals, historySearch } = smartMoney;
   const minRaw = parseFloat(document.getElementById('smMinValue')?.value) || 0;
   const mktFilter = filters.market;
+  const hsQ = historySearch.toLowerCase();
 
   // Update unit label
   const unitEl = document.getElementById('smValueUnit');
@@ -5182,15 +5208,48 @@ function renderSmartMoney() {
     if (minRaw > 0) {
       const nativeVal = d.market === 'us' ? d.value / 1e6 : d.value / 1e7;
       if (mktFilter === 'all') {
-        // Compare each deal in its own unit
-        if (d.market === 'us' && (d.value / 1e6) < minRaw) return false;
-        if (d.market === 'india' && (d.value / 1e7) < minRaw) return false;
+        if (d.market === 'us'     && (d.value / 1e6) < minRaw) return false;
+        if (d.market === 'india'  && (d.value / 1e7) < minRaw) return false;
       } else {
         if (nativeVal < minRaw) return false;
       }
     }
+    if (hsQ) {
+      const match = d.sym.toLowerCase().includes(hsQ)
+        || d.name.toLowerCase().includes(hsQ)
+        || d.entity.toLowerCase().includes(hsQ);
+      if (!match) return false;
+    }
     return true;
   });
+
+  // History summary strip
+  const summaryEl  = document.getElementById('smHistorySummary');
+  const titleEl    = document.getElementById('smFeedTitle');
+  if (hsQ && summaryEl) {
+    let hBuy = 0, hSell = 0, hBuyN = 0, hSellN = 0;
+    filtered.forEach(d => {
+      if (d.side === 'buy')  { hBuy  += d.value; hBuyN++;  }
+      else                   { hSell += d.value; hSellN++; }
+    });
+    const hNet = hBuy - hSell;
+    const hsLabel = historySearch.length > 22 ? historySearch.slice(0, 22) + '…' : historySearch;
+    if (titleEl) titleEl.textContent = 'History: ' + hsLabel;
+    summaryEl.style.display = 'flex';
+    const setT = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    setT('smHsBuy',    _smFmtStat(hBuy,  mktFilter));
+    setT('smHsBuyN',   hBuyN  + ' txns');
+    setT('smHsSell',   _smFmtStat(hSell, mktFilter));
+    setT('smHsSellN',  hSellN + ' txns');
+    setT('smHsNet',    (hNet >= 0 ? '+' : '') + _smFmtStat(Math.abs(hNet), mktFilter));
+    setT('smHsNetLbl', hNet >= 0 ? 'Net buyer' : 'Net seller');
+    setT('smHsCount',  filtered.length + ' deals');
+    const netEl = document.getElementById('smHsNet');
+    if (netEl) netEl.className = 'sm-hs-val ' + (hNet >= 0 ? 'positive' : 'negative');
+  } else {
+    if (summaryEl) summaryEl.style.display = 'none';
+    if (titleEl)   titleEl.textContent = 'Live Deal Feed';
+  }
 
   // Stats
   let buyVal = 0, sellVal = 0, buyN = 0, sellN = 0;
@@ -5232,13 +5291,15 @@ function renderSmartMoney() {
     const srcHtml = d.source
       ? `<a class="sm-source-tag" href="${d.source.url}" target="_blank" rel="noopener noreferrer" title="View on ${d.source.name}"><i class="fa-solid fa-arrow-up-right-from-square" style="font-size:9px;margin-right:3px"></i>${d.source.name}</a>`
       : '—';
+    const safeEntity = d.entity.replace(/'/g, "\\'");
+    const safeSym    = d.sym.replace(/'/g, "\\'");
     return `<tr class="sm-row-${d.side}${d.isNew ? ' sm-row-new' : ''}">
       <td class="sm-time mono">${d.timeStr}</td>
-      <td><span class="sm-sym">${flag} ${d.sym}</span></td>
-      <td class="sm-company">${d.name}</td>
+      <td><span class="sm-sym sm-clickable" title="Show history for ${d.sym}" onclick="smDrillDown('${safeSym}')">${flag} ${d.sym}</span></td>
+      <td class="sm-company sm-clickable" title="Show history for ${d.name}" onclick="smDrillDown('${d.name.replace(/'/g,"\\'")}')">${d.name}</td>
       <td><span class="sm-type-badge ${tbCls}">${tbLbl}</span></td>
       <td><span class="sm-side-badge ${d.side}">${d.side === 'buy' ? 'BUY' : 'SELL'}</span></td>
-      <td class="sm-entity">${d.entity}</td>
+      <td class="sm-entity sm-clickable" title="Show history for ${d.entity}" onclick="smDrillDown('${safeEntity}')">${d.entity}</td>
       <td class="mono sm-qty">${qtyFmt}</td>
       <td class="mono">${priceFmt}</td>
       <td class="sm-value-cell">${_smFmtVal(d)}</td>
