@@ -4086,7 +4086,7 @@ function renderPicks() {
       onclick="event.stopPropagation();watchCurrentFromPick('${isIndia?'india':'us'}','${safeSym}','${s.name.replace(/'/g,"\\'")}')"
       title="Add to watchlist"><i class="fa-regular fa-star"></i></button>`;
 
-    return `<div class="pick-card ${catCls}" onclick="${clickFn}">
+    return `<div class="pick-card ${catCls}" onclick="openPickReport('${safeSym}', ${isIndia})">
       <div class="pick-card-top">
         <span class="pick-rank">#${rank + 1}</span>
         <div class="pick-sym-block">
@@ -4144,6 +4144,275 @@ function watchCurrentFromPick(market, symbol, name) {
   saveWatchlists();
   renderWatchlistTabs();
   toast(`${symbol} added to "${state.activeWatchlist}"`);
+}
+
+// =====================================================================
+// TOP PICKS — DETAILED REPORT
+// =====================================================================
+
+// Mirrors the exact scoring bands in scoreStock() so explanations never drift.
+function explainScore(s, isIndia) {
+  const p = s.score.pts;
+  const range = (s.w52h || 0) - (s.w52l || 0);
+
+  // ── Valuation ──────────────────────────────────────────────────────
+  const vr = [];
+  if (s.pe > 0) {
+    if      (s.pe >= 8 && s.pe <= 15) vr.push(`P/E ${s.pe.toFixed(1)} in the low 8–15 band (undervalued) → +25`);
+    else if (s.pe > 15 && s.pe <= 25) vr.push(`P/E ${s.pe.toFixed(1)} is moderate (15–25) → +18`);
+    else if (s.pe > 25 && s.pe <= 40) vr.push(`P/E ${s.pe.toFixed(1)} is elevated (25–40) → +11`);
+    else if (s.pe < 8)                vr.push(`P/E ${s.pe.toFixed(1)} is very low — deep value → +16`);
+    else                              vr.push(`P/E ${s.pe.toFixed(1)} is high premium (>40) → +4`);
+  } else vr.push('No P/E available (loss-making or unreported) — baseline +8');
+  if (range > 0) {
+    const pos = (s.price - s.w52l) / range;
+    if      (pos < 0.25) vr.push(`Near 52-week low (${(pos*100).toFixed(0)}% of range) — significant upside room → +5`);
+    else if (pos < 0.50) vr.push(`Lower half of 52-week range (${(pos*100).toFixed(0)}%) → +3`);
+    else if (pos < 0.75) vr.push(`Upper-middle of 52-week range (${(pos*100).toFixed(0)}%) → +1`);
+    else                 vr.push(`Near 52-week high (${(pos*100).toFixed(0)}% of range) — limited valuation cushion`);
+  }
+  if (s.avHasData && s.avPEG > 0) {
+    if      (s.avPEG < 1) vr.push(`PEG ratio ${s.avPEG.toFixed(2)} < 1 — undervalued vs growth rate → +2`);
+    else if (s.avPEG < 2) vr.push(`PEG ratio ${s.avPEG.toFixed(2)} — moderate growth premium → +1`);
+  }
+
+  // ── Quality ────────────────────────────────────────────────────────
+  const qr = [];
+  const mcap = s.mcap || 0;
+  if (isIndia) {
+    if      (mcap >= 10e12) qr.push(`${fmtMcap(mcap,true)} — Mega cap, highest stability tier → +12`);
+    else if (mcap >=  3e12) qr.push(`${fmtMcap(mcap,true)} — Large cap, strong institutional backing → +10`);
+    else if (mcap >=  1e12) qr.push(`${fmtMcap(mcap,true)} — Mid cap, moderate stability → +7`);
+    else                    qr.push(`${fmtMcap(mcap,true)} — Small cap, higher risk → +4`);
+  } else {
+    if      (mcap >= 500e9) qr.push(`${fmtMcap(mcap)} — Mega cap, highest stability tier → +12`);
+    else if (mcap >= 100e9) qr.push(`${fmtMcap(mcap)} — Large cap, strong institutional backing → +10`);
+    else if (mcap >=  20e9) qr.push(`${fmtMcap(mcap)} — Mid cap, moderate stability → +7`);
+    else                    qr.push(`${fmtMcap(mcap)} — Small cap, higher risk → +4`);
+  }
+  const beta = s.beta || 1;
+  if      (beta >= 0.4 && beta <= 1.1) qr.push(`Beta ${beta.toFixed(2)} in stable 0.4–1.1 sweet spot → +8`);
+  else if (beta > 1.1  && beta <= 1.4) qr.push(`Beta ${beta.toFixed(2)} slightly above ideal — moderate volatility → +5`);
+  else if (beta > 1.4  && beta <= 1.8) qr.push(`Beta ${beta.toFixed(2)} — high volatility, larger price swings → +2`);
+  else if (beta < 0.4)                 qr.push(`Beta ${beta.toFixed(2)} — defensive, moves less than market → +5`);
+  else                                 qr.push(`Beta ${beta.toFixed(2)} — very high volatility → +1`);
+  const avgVol = s.avgVol || 0;
+  if      (avgVol >= 10e6) qr.push(`Avg daily vol ${fmtVol(avgVol)} — excellent liquidity → +5`);
+  else if (avgVol >=  2e6) qr.push(`Avg daily vol ${fmtVol(avgVol)} — good liquidity → +3`);
+  else                     qr.push(`Avg daily vol ${fmtVol(avgVol)} — limited liquidity → +1`);
+  if (s.avHasData) {
+    if      ((s.avROE||0) > 0.25) qr.push(`ROE ${((s.avROE||0)*100).toFixed(1)}% — excellent capital efficiency → +2`);
+    else if ((s.avROE||0) > 0.12) qr.push(`ROE ${((s.avROE||0)*100).toFixed(1)}% — solid returns → +1`);
+    if      ((s.avMargin||0) > 0.20) qr.push(`Profit margin ${((s.avMargin||0)*100).toFixed(1)}% — highly profitable → +2`);
+    else if ((s.avMargin||0) > 0.10) qr.push(`Profit margin ${((s.avMargin||0)*100).toFixed(1)}% — healthy margins → +1`);
+  }
+
+  // ── Income ─────────────────────────────────────────────────────────
+  const ir = [];
+  const div = s.div || 0;
+  const isFin = ['Finance', 'Banking', 'Financial Services'].includes(s.sector);
+  if      (div >= 5)   ir.push(`Dividend yield ${div.toFixed(2)}% — high yield, strong income → +20`);
+  else if (div >= 3)   ir.push(`Dividend yield ${div.toFixed(2)}% — good yield → +15`);
+  else if (div >= 2)   ir.push(`Dividend yield ${div.toFixed(2)}% — moderate payout → +11`);
+  else if (div >= 0.5) ir.push(`Dividend yield ${div.toFixed(2)}% — small but consistent payout → +6`);
+  else if (isFin && s.pe > 0 && s.pe < 20) ir.push(`Bank/NBFC: low P/E ${s.pe.toFixed(1)} — scored on earnings quality rather than yield → +10`);
+  else if (isFin)      ir.push('Bank/NBFC — reinvests earnings rather than paying dividends → +7');
+  else                 ir.push('No meaningful dividend — growth-focused reinvestment (0 income pts)');
+
+  // ── Momentum ───────────────────────────────────────────────────────
+  const mr = [];
+  const c = s.chgPct || 0;
+  const mPts = c>=2?'+15 strong bullish':c>=1?'+11 positive':c>=0?'+7 flat-up':c>=-1?'+4 mild dip':c>=-2?'+2 weak':'+0 selling';
+  mr.push(`1-day move ${chgSign(c)}${c.toFixed(2)}% — ${mPts}`);
+  if (s.vol > 0 && avgVol > 0) {
+    const vr2 = s.vol / avgVol;
+    if (vr2 >= 1.5) mr.push(`Volume ${fmtVol(s.vol)} is ${vr2.toFixed(1)}× average — unusual activity / strong conviction`);
+    else            mr.push(`Volume ${fmtVol(s.vol)} is ${vr2.toFixed(1)}× average`);
+  }
+  if (s.avHasData && s.avMA200 && s.price) {
+    const fmt2 = isIndia ? fmtINR : fmtUSD;
+    mr.push(s.price > s.avMA200
+      ? `Price above 200-DMA ${fmt2(s.avMA200)} — established uptrend → +1`
+      : `Price below 200-DMA ${fmt2(s.avMA200)} — below long-term trend`);
+  }
+
+  // ── Growth ─────────────────────────────────────────────────────────
+  const gr = [];
+  if (range > 0) {
+    const fh = (s.w52h - s.price) / s.price;
+    gr.push(`${(fh*100).toFixed(0)}% below 52-week high — ${fh<0.05?'at highs, strong trend → +10':fh<0.15?'near highs → +7':fh<0.30?'moderate drawdown → +4':'significant drawdown → +2'}`);
+  }
+  if (s.avHasData && s.avTargetPrice && s.price) {
+    const up = (s.avTargetPrice - s.price) / s.price * 100;
+    const fmt2 = isIndia ? fmtINR : fmtUSD;
+    gr.push(`Analyst consensus target ${fmt2(s.avTargetPrice)} — ${up>=0?'+':''}${up.toFixed(1)}% implied upside${up>25?' → +4':up>10?' → +2':up<-5?' (above target)':''}`);
+  }
+  if (s.avHasData && (s.avEarningsGrowth||0) > 0.05) {
+    gr.push(`EPS growth ${((s.avEarningsGrowth||0)*100).toFixed(1)}% YoY → ${(s.avEarningsGrowth||0)>0.15?'+2':'+1'}`);
+  }
+
+  return {
+    valuation: { score: p.valuation, max: 30, reasons: vr },
+    quality:   { score: p.quality,   max: 25, reasons: qr },
+    income:    { score: p.income,    max: 20, reasons: ir },
+    momentum:  { score: p.momentum,  max: 15, reasons: mr },
+    growth:    { score: p.growth,    max: 10, reasons: gr },
+  };
+}
+
+function closePickReport() {
+  const o = $('pickReportOverlay');
+  if (o) o.className = 'pick-report-overlay';
+}
+
+function loadPickInTerminal(symbol, isIndia) {
+  closePickReport();
+  isIndia ? loadIndiaQuick(symbol) : loadUSQuick(symbol);
+}
+
+async function openPickReport(symbol, isIndia) {
+  const data = isIndia ? picksState.india : picksState.us;
+  const s = data?.find(x => x.symbol === symbol);
+  if (!s) { toast('Pick data unavailable', 'error'); return; }
+
+  const overlay = $('pickReportOverlay');
+  overlay.className = 'pick-report-overlay open';
+  const body = $('pickReportBody');
+  const fmt2 = isIndia ? fmtINR : fmtUSD;
+  const sc = s.score;
+  const expl = explainScore(s, isIndia);
+
+  // News: live feed first, then fall back to curated NEWS_DB
+  let news = newsState.feed.filter(n => (n.stocks||[]).includes(symbol) && n.market===(isIndia?'india':'us')).slice(0, 5);
+  if (news.length < 2) {
+    const inferSrc = h => /fed|rbi|rate|inflation|gdp|cpi/i.test(h) ? 'Reuters' :
+                          /earnings|profit|revenue|PAT|quarterly/i.test(h) ? 'Bloomberg' :
+                          /fda|usfda|drug|pharma/i.test(h) ? 'BioPharma Dive' :
+                          /antitrust|court|probe|fine/i.test(h) ? 'Financial Times' :
+                          isIndia ? 'Economic Times' : 'MarketWatch';
+    const fallback = NEWS_DB
+      .filter(n => n.stocks.includes(symbol) && n.market===(isIndia?'india':'us'))
+      .map(n => ({ ...n, ts: Date.now() - n.ageMin * 60 * 1000, source: inferSrc(n.headline) }));
+    news = [...news, ...fallback].slice(0, 5);
+  }
+
+  const catBlock = (key, label, color) => {
+    const r = expl[key];
+    return `<div class="prpt-cat">
+      <div class="prpt-cat-head">
+        <span class="prpt-cat-name" style="color:${color}">${label}</span>
+        <span class="prpt-cat-score">${r.score}/${r.max}</span>
+      </div>
+      <div class="prpt-cat-bar"><div style="width:${(r.score/r.max*100).toFixed(0)}%;background:${color}"></div></div>
+      <ul class="prpt-cat-reasons">${r.reasons.map(x=>`<li>${x}</li>`).join('')}</ul>
+    </div>`;
+  };
+
+  const newsHtml = news.length ? news.map(n => {
+    const srcUrl = (n.url && n.url.startsWith('http')) ? n.url : (NEWS_SOURCE_URLS[n.source] || '#');
+    return `<div class="prpt-news">
+      <span class="news-severity-dot ${n.severity||'medium'}"></span>
+      <div>
+        <a href="${srcUrl}" target="_blank" rel="noopener noreferrer">${n.headline}</a>
+        <span class="prpt-news-src">${n.source||'Market Wire'} · ${timeAgo(n.ts)}</span>
+      </div>
+    </div>`;
+  }).join('') : `<p class="prpt-muted">No recent news tagged for ${symbol}. Check the news feed for macro updates.</p>`;
+
+  const safeSym = symbol.replace(/'/g, "\\'");
+
+  body.innerHTML = `
+    <div class="prpt-top">
+      <div>
+        <div class="prpt-sym">${s.symbol} <span class="prpt-flag">${isIndia?'🇮🇳':'🇺🇸'}</span></div>
+        <div class="prpt-name">${s.name}</div>
+        <div class="prpt-sector-badge">${s.sector}</div>
+      </div>
+      <div class="prpt-rating-wrap">
+        <span class="prpt-rating" style="color:${sc.ratingColor};border-color:${sc.ratingColor}">${sc.rating}</span>
+        <span class="prpt-total">${sc.total.toFixed(1)}<small>/100</small></span>
+      </div>
+    </div>
+
+    <div class="prpt-section">
+      <h4><i class="fa-solid fa-table-cells"></i> Fundamentals</h4>
+      <div class="prpt-fund-grid" id="prptFundGrid">
+        <div class="prpt-fund"><span>Price</span><strong>${fmt2(s.price)}</strong></div>
+        <div class="prpt-fund"><span>P/E (TTM)</span><strong>${s.pe ? s.pe.toFixed(1) : '—'}</strong></div>
+        <div class="prpt-fund"><span>Beta</span><strong>${s.beta ? s.beta.toFixed(2) : '—'}</strong></div>
+        <div class="prpt-fund"><span>Div Yield</span><strong class="${s.div>0?'positive':''}">${s.div ? s.div.toFixed(2)+'%' : 'Nil'}</strong></div>
+        <div class="prpt-fund"><span>Market Cap</span><strong>${fmtMcap(s.mcap, isIndia)}</strong></div>
+        <div class="prpt-fund"><span>52W High</span><strong>${fmt2(s.w52h)}</strong></div>
+        <div class="prpt-fund"><span>52W Low</span><strong>${fmt2(s.w52l)}</strong></div>
+        <div class="prpt-fund"><span>1D Change</span><strong class="${chgClass(s.chgPct)}">${chgSign(s.chgPct)}${(s.chgPct||0).toFixed(2)}%</strong></div>
+        ${s.avHasData && s.avTargetPrice ? `<div class="prpt-fund"><span>Analyst Target</span><strong class="${s.avTargetPrice>s.price?'positive':'negative'}">${fmt2(s.avTargetPrice)}</strong></div>` : ''}
+        ${s.avHasData && s.avForwardPE   ? `<div class="prpt-fund"><span>Forward P/E</span><strong>${s.avForwardPE.toFixed(1)}</strong></div>` : ''}
+        ${s.avHasData && s.avROE   != null ? `<div class="prpt-fund"><span>ROE</span><strong class="${s.avROE>0.15?'positive':''}">${(s.avROE*100).toFixed(1)}%</strong></div>` : ''}
+        ${s.avHasData && s.avMargin != null ? `<div class="prpt-fund"><span>Profit Margin</span><strong class="${s.avMargin>0.15?'positive':''}">${(s.avMargin*100).toFixed(1)}%</strong></div>` : ''}
+        <div class="prpt-fund prpt-loading" id="prptLivePlaceholder"><span>Fetching live financials…</span><i class="fa-solid fa-circle-notch fa-spin" style="margin-left:6px;opacity:.5"></i></div>
+      </div>
+    </div>
+
+    <div class="prpt-section">
+      <h4><i class="fa-solid fa-flask"></i> Why This Score</h4>
+      ${catBlock('valuation','Valuation','var(--us)')}
+      ${catBlock('quality','Quality','var(--green)')}
+      ${catBlock('income','Income','var(--yellow)')}
+      ${catBlock('momentum','Momentum','var(--india)')}
+      ${catBlock('growth','Growth','#bc8cff')}
+    </div>
+
+    <div class="prpt-section">
+      <h4><i class="fa-solid fa-bolt"></i> Recent News</h4>
+      ${newsHtml}
+    </div>
+
+    <div class="prpt-disclaimer">
+      <i class="fa-solid fa-circle-info" style="margin-right:5px;opacity:.7"></i>
+      Scores are algorithmic, based on quantitative factors only — not investment advice. Always conduct your own research.
+    </div>
+
+    <button class="prpt-chart-btn" onclick="loadPickInTerminal('${safeSym}', ${isIndia})">
+      <i class="fa-solid fa-chart-candlestick"></i> Open Chart in Terminal
+    </button>
+  `;
+
+  // Async live stats (US only — Twelve Data statistics endpoint is US-centric)
+  if (!isIndia) {
+    try {
+      const stats = await fetchTwelveStats(symbol);
+      if (!$('pickReportOverlay')?.classList.contains('open')) return;
+      const placeholder = $('prptLivePlaceholder');
+      if (placeholder) placeholder.remove();
+      if (stats?.statistics) {
+        const m = mapTwelveStats(stats, s);
+        const grid = $('prptFundGrid');
+        if (grid) {
+          const addFund = (label, val, cls='') => {
+            if (val == null) return;
+            const d = document.createElement('div');
+            d.className = 'prpt-fund';
+            d.innerHTML = `<span>${label}</span><strong class="${cls}">${val}</strong>`;
+            grid.appendChild(d);
+          };
+          if (!s.avForwardPE)      addFund('Forward P/E',  m.avForwardPE  != null ? m.avForwardPE.toFixed(1)                  : null);
+          if (!s.avPEG)            addFund('PEG Ratio',    m.avPEG        != null ? m.avPEG.toFixed(2)                        : null);
+          if (!s.avROE)            addFund('ROE',          m.avROE        != null ? (m.avROE*100).toFixed(1)+'%'              : null, (m.avROE||0)>0.15?'positive':'');
+          if (!s.avMargin)         addFund('Profit Margin',m.avMargin     != null ? (m.avMargin*100).toFixed(1)+'%'           : null, (m.avMargin||0)>0.15?'positive':'');
+                                   addFund('EPS (TTM)',    m.avEPS        != null ? fmt2(m.avEPS)                             : null);
+                                   addFund('Rev Growth',  m.avRevenueGrowth != null ? (m.avRevenueGrowth*100).toFixed(1)+'%' : null, (m.avRevenueGrowth||0)>0?'positive':'negative');
+                                   addFund('50-Day MA',   m.avMA50       != null ? fmt2(m.avMA50)                            : null);
+                                   addFund('200-Day MA',  m.avMA200      != null ? fmt2(m.avMA200)                           : null);
+        }
+      }
+    } catch {
+      const placeholder = $('prptLivePlaceholder');
+      if (placeholder) placeholder.innerHTML = '<span class="prpt-muted">Live data unavailable</span>';
+    }
+  } else {
+    const placeholder = $('prptLivePlaceholder');
+    if (placeholder) placeholder.remove();
+  }
 }
 
 // =====================================================================

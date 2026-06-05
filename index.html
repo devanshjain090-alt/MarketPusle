@@ -1382,6 +1382,17 @@
   </div>
 </div>
 
+<!-- =================== PICK REPORT PANEL =================== -->
+<div class="pick-report-overlay" id="pickReportOverlay" onclick="closePickReport()">
+  <div class="pick-report-panel" onclick="event.stopPropagation()">
+    <div class="pick-report-head">
+      <button class="pick-report-back" onclick="closePickReport()"><i class="fa-solid fa-arrow-left"></i> Back to Picks</button>
+      <button class="pick-report-close" onclick="closePickReport()">×</button>
+    </div>
+    <div class="pick-report-body" id="pickReportBody"></div>
+  </div>
+</div>
+
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="js/app.js"></script>
