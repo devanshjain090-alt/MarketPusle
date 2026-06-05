@@ -960,21 +960,21 @@ function watchTVPrice(containerEl, sym, onPrice) {
   }
 }
 
-function initIndiaChart(symbol, interval = 'D', range = null) {
+function initIndiaChart(symbol) {
   const el = $('tv_india'); if (!el) return;
   el.innerHTML = '';
   if (typeof TradingView === 'undefined') { el.innerHTML='<div style="padding:40px;text-align:center;color:var(--text3)">Loading chart…</div>'; return; }
   try {
-    const cfg = {
-      autosize: true, symbol, interval,
+    state.tvIndia = new TradingView.widget({
+      autosize: true, symbol, interval: 'D',
       timezone: 'Asia/Kolkata', theme: 'dark', style: '1',
-      locale: 'en', enable_publishing: false, withdateranges: true,
+      locale: 'en', enable_publishing: false,
+      hide_top_toolbar: false, withdateranges: true,
       hide_side_toolbar: false, allow_symbol_change: false,
+      save_image: false,
       studies: ['RSI@tv-basicstudies','MACD@tv-basicstudies','Volume@tv-basicstudies'],
       container_id: 'tv_india'
-    };
-    if (range) cfg.range = range;
-    state.tvIndia = new TradingView.widget(cfg);
+    });
   } catch(e) { el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3)">Chart unavailable offline</div>'; }
 
   // Extract live price as TradingView renders the chart
@@ -999,25 +999,6 @@ function initIndiaChart(symbol, interval = 'D', range = null) {
       renderPortfolio();
     }
   });
-}
-
-const _INDIA_TF_MAP = {
-  '1D': { interval: '15', range: '1D'  },
-  '1W': { interval: '60', range: '5D'  },
-  '1M': { interval: 'D',  range: '1M'  },
-  '3M': { interval: 'D',  range: '3M'  },
-  '6M': { interval: 'D',  range: '6M'  },
-  '1Y': { interval: 'W',  range: '12M' },
-  '5Y': { interval: 'M',  range: '60M' },
-};
-
-function setIndiaTF(btn, tf) {
-  document.querySelectorAll('#indiaTFBar .tf-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  const { interval, range } = _INDIA_TF_MAP[tf] || { interval: 'D', range: null };
-  const sym = state.currentIndia?.symbol || 'RELIANCE';
-  const ex  = state.indiaExchange || 'BSE';
-  initIndiaChart(`${ex}:${sym}`, interval, range);
 }
 
 // =====================================================================
