@@ -83,6 +83,7 @@ const state = {
   watchlists: {},
   activeWatchlist: 'My Watchlist',
   section: 'dashboard',
+  navSource: null,   // section that launched the terminal — used for the ← back button
   currentUS: { symbol:'AAPL', name:'Apple Inc.', exchange:'NASDAQ' },
   currentIndia: { symbol:'RELIANCE', name:'Reliance Industries Ltd.', exchange:'BSE' },
   indiaExchange: 'BSE',
@@ -178,7 +179,19 @@ function switchSection(id) {
   const page = document.getElementById(id);
   if (page) page.classList.add('active');
   document.querySelectorAll(`.nav-item[data-section="${id}"]`).forEach(n => n.classList.add('active'));
+
+  // Track the originating section for the terminal back button.
+  // Only capture when entering a terminal from a non-terminal page — this preserves
+  // the original source (e.g. Smart Money) even if the user taps another stock
+  // from within the terminal, since both sides would then be terminals.
+  const isTerminal       = id === 'us-terminal' || id === 'india-terminal';
+  const cameFromTerminal = state.section === 'us-terminal' || state.section === 'india-terminal';
+  if (isTerminal && state.section !== id && !cameFromTerminal) {
+    state.navSource = state.section;
+  }
+
   state.section = id;
+  _updateTerminalBackBtn();
   if (id === 'us-terminal' && !state.tvUS) initUSChart('NASDAQ:AAPL');
   if (id === 'india-terminal' && !state.tvIndia) initIndiaChart('BSE:RELIANCE');
   if (id === 'portfolio') { renderPortfolio(); fetchLivePrices(); }
@@ -198,6 +211,30 @@ function switchSection(id) {
 document.querySelectorAll('.nav-item[data-section]').forEach(el => {
   el.addEventListener('click', e => { e.preventDefault(); switchSection(el.dataset.section); });
 });
+
+const _SECTION_LABELS = {
+  'dashboard': 'Dashboard', 'portfolio': 'Portfolio', 'picks': 'Top Picks',
+  'smart-money': 'Smart Money', 'watchlist': 'Watchlist', 'screener': 'Screener',
+  'xray': 'X-Ray', 'ai-chat': 'AI Chat',
+};
+
+function _updateTerminalBackBtn() {
+  const src   = state.navSource;
+  const label = src ? (_SECTION_LABELS[src] || src) : null;
+  ['termBackBtnUS', 'termBackBtnIndia'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    if (label) { btn.textContent = '← ' + label; btn.style.display = 'inline-flex'; }
+    else        { btn.style.display = 'none'; }
+  });
+}
+
+function terminalGoBack() {
+  const dest = state.navSource;
+  state.navSource = null;
+  _updateTerminalBackBtn();
+  if (dest) switchSection(dest);
+}
 
 // ── Sidebar rail toggle ──
 (function() {

@@ -680,6 +680,14 @@ body.sidebar-rail .nav-item[data-label]:hover::after {
 
 .term-title { display: flex; align-items: center; gap: 10px; }
 .term-flag  { font-size: 22px; }
+.term-back-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 2px;
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  background: var(--bg3); color: var(--text2); border: 1px solid var(--border);
+  cursor: pointer; transition: var(--transition); white-space: nowrap; flex-shrink: 0;
+}
+.term-back-btn:hover { color: var(--gold); border-color: var(--gold); background: var(--gold-dim); }
 .exchange-pills { display: flex; gap: 4px; }
 .xpill {
   font-family: var(--mono);
