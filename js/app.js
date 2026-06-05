@@ -1041,6 +1041,61 @@ function initIndiaChart(symbol) {
 // =====================================================================
 // US TERMINAL
 // =====================================================================
+
+// NYSE-listed symbols — everything NOT in this set gets a bare symbol
+// so TradingView auto-resolves the exchange rather than assuming NASDAQ.
+// Covers every stock in US_STOCKS_DB + MCAP_RANK_US that is NYSE-listed.
+const NYSE_SYMBOLS = new Set([
+  // Mega-cap / blue-chip NYSE
+  'V','MA','JPM','BAC','WMT','DIS','XOM','CVX','JNJ','UNH','PFE','T','VZ','KO','CRM',
+  'PG','HD','MRK','IBM','GS','AXP','MS','WFC','USB','PNC','TFC','COF','C','BK',
+  // Finance / Insurance
+  'MCO','FIS','FI','ICE','CME','CBOE','MSCI','SPGI','BR','MMC','AON','MET','PRU','ALL','TRV',
+  'BLK','SCHW','CB',
+  // Healthcare / Pharma / Services
+  'TMO','MDT','SYK','BDX','EW','ZBH','TFX','STE','LH','DGX','HCA','CNC','CI','HUM',
+  'CVS','MCK','ABC','CAH','HOLX','BAX','IQV','LLY','ABT','BMY',
+  // Consumer Discretionary
+  'MCD','YUM','CMG','RCL','CCL','NCLH','MAR','HLT','NKE','TGT','TJX','ROST','DG','DLTR',
+  'F','GM','TM','HMC','STLA','BWA','LEA','MGA',
+  // Consumer Staples
+  'CL','CHD','EL','KMB','SJM','CAG','HRL','MKC','COTY',
+  // Energy
+  'SLB','HAL','BKR','OXY','PSX','VLO','MPC','HES','COP','EOG','DVN','MRO','CLR',
+  'APA','SM','ESTE','VTLE','XOM','CVX',
+  // Industrials / Aerospace / Defence
+  'BA','LMT','NOC','GD','TDG','HEI','HWM','SPR','MMM','ITW','EMR','ROK','PH',
+  'IR','XYL','IDEX','ROP','AME','CSX','NSC','UNP','WAB','TRN','GBX','GATX',
+  'CAT','DE','GE','HON','RTX','UPS','ETN','LOW',
+  // Utilities
+  'NEE','SO','DUK','AEP','EXC','SRE','PCG','ED','FE','ETR','CNP',
+  // REITs
+  'AMT','PLD','CCI','EQIX','DLR','PSA','AVB','EQR','O','WPC',
+  // Materials
+  'LIN','APD','ECL','SHW','PPG','NEM','FCX','AA','NUE','STLD',
+  // Tech / Software (NYSE-listed)
+  'IBM','NOW','ORCL','ACN','DELL','HPE',
+  // Media & Telco
+  'DIS','T','VZ','WBD',
+  // Fintech
+  'SQ',
+  // ETFs (NYSE Arca)
+  'SPY','IWM','EFA','VTI','VOO','VEA','GLD','SLV','TLT',
+  'XLF','XLK','XLE','XLV','XLI','XLU','XLY','XLP','XLB','XLRE',
+]);
+
+// Returns the correct TradingView symbol string for a US stock.
+// Priority: (1) live exchange already resolved from API, (2) NYSE_SYMBOLS map,
+// (3) bare symbol — TradingView auto-resolves rather than wrongly assuming NASDAQ.
+function tvUSSymbol(symbol) {
+  const sym = symbol.toUpperCase();
+  if (state.currentUS?.symbol === sym) {
+    const ex = state.currentUS.exchange;
+    if (ex === 'NYSE' || ex === 'NASDAQ') return `${ex}:${sym}`;
+  }
+  if (NYSE_SYMBOLS.has(sym)) return `NYSE:${sym}`;
+  return sym; // bare — TradingView picks the right exchange
+}
 function fillUSStats(data) {
   const isIndia = false;
   const p = data;
@@ -1075,18 +1130,25 @@ function analyzeUSStock() {
 async function loadUSQuick(symbol) {
   const found = US_STOCKS_DB.find(s => s.symbol === symbol);
   const local = found || { symbol, name: symbol, sector:'—', price:150, chg:1.2, chgPct:0.8, mcap:50e9, pe:20, vol:5e6, avgVol:5e6, div:0, beta:1, w52h:180, w52l:120 };
-  state.currentUS = { symbol, name: local.name, exchange: local.exchange || 'NASDAQ' };
+  state.currentUS = { symbol, name: local.name, exchange: NYSE_SYMBOLS.has(symbol) ? 'NYSE' : '' };
   fillUSStats(local);
-  initUSChart(`NASDAQ:${symbol}`);
+  initUSChart(tvUSSymbol(symbol));
   if ($('usSearchInput')) $('usSearchInput').value = symbol;
   switchSection('us-terminal');
 
-  // Fetch live data from Twelve Data
+  // Fetch live data from Twelve Data — also use the confirmed exchange to correct chart if needed
   const quotes = await fetchTwelveQuote(symbol);
   if (quotes.length && state.currentUS.symbol === symbol) {
     const live = mapTwelveQuote(quotes[0], local);
     const exName = quotes[0].exchange || '';
-    if (exName) state.currentUS.exchange = exName.includes('Nasdaq') ? 'NASDAQ' : exName.includes('NYSE') ? 'NYSE' : exName;
+    if (exName) {
+      const resolvedEx = exName.includes('Nasdaq') ? 'NASDAQ' : exName.includes('NYSE') ? 'NYSE' : exName;
+      const wasGuess = !NYSE_SYMBOLS.has(symbol); // bare symbol was used — may need correction
+      if (wasGuess && (resolvedEx === 'NYSE' || resolvedEx === 'NASDAQ')) {
+        state.currentUS.exchange = resolvedEx;
+        initUSChart(`${resolvedEx}:${symbol}`); // re-init with confirmed exchange
+      }
+    }
     fillUSStats(live);
   }
 }
