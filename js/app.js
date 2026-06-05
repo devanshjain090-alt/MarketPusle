@@ -1097,6 +1097,9 @@ function tvUSSymbol(symbol) {
   return sym; // bare — TradingView picks the right exchange
 }
 function fillUSStats(data) {
+  if (state.currentUS && state.currentUS.symbol === data.symbol) {
+    state.currentUS._snap = { price: data.price, chg: data.chg, chgPct: data.chgPct, w52h: data.w52h ?? 0, w52l: data.w52l ?? 0, sector: data.sector ?? null, pe: data.pe ?? null };
+  }
   const isIndia = false;
   const p = data;
   setEl('usSymbolDisplay', p.symbol || '—');
@@ -1184,6 +1187,9 @@ function setIndiaExchange(ex) {
 }
 
 function fillIndiaStats(data) {
+  if (state.currentIndia && state.currentIndia.symbol === data.symbol) {
+    state.currentIndia._snap = { price: data.price, chg: data.chg, chgPct: data.chgPct, w52h: data.w52h ?? 0, w52l: data.w52l ?? 0, sector: data.sector ?? null, pe: data.pe ?? null };
+  }
   setEl('indiaSymbolDisplay', data.symbol || '—');
   setEl('indiaNameDisplay', data.name || '—');
   const exEl = $('indiaExDisplay');
@@ -1507,34 +1513,46 @@ function watchSearchSelect(symbol) {
   closeDrop('watchSearchDrop');
 }
 
+let _portSelectedMeta = null;
+
 async function portSearchSelect(symbol, name, sector, price) {
   portIn.value = symbol;
   if ($('fName')) $('fName').value = name || symbol;
+  _portSelectedMeta = { symbol, name: name || symbol, sector: null, chgPct: 0, w52h: 0, w52l: 0, pe: null };
   const sEl = $('fSector');
-  // Try to find sector in local DB
   const localStock = SEARCH_DB.find(s => s.symbol === symbol);
   if (sEl && localStock?.sector) {
     const o = Array.from(sEl.options).find(o => o.value === localStock.sector);
     if (o) sEl.value = localStock.sector;
+    _portSelectedMeta.sector = localStock.sector;
   }
   const priceEl = $('fPrice');
   if (priceEl) {
     const localPrice = localStock?.price || price;
     if (localPrice) {
       priceEl.value = localPrice;
+      if (localStock) _portSelectedMeta = { symbol, name: localStock.name || name || symbol, sector: localStock.sector ?? null, chgPct: localStock.chgPct ?? 0, w52h: localStock.w52h ?? 0, w52l: localStock.w52l ?? 0, pe: localStock.pe ?? null };
       updateInvestPreview();
     } else {
-      // Fetch live price for stocks not in local DB
       priceEl.placeholder = 'Fetching price…';
       const mkt = $('modalMarket')?.value || 'us';
       try {
         if (mkt === 'us') {
           const q = await fetchTwelveQuote(symbol);
-          if (q.length) { priceEl.value = parseFloat(q[0].close).toFixed(2); updateInvestPreview(); }
+          if (q.length) {
+            priceEl.value = parseFloat(q[0].close).toFixed(2);
+            const m = mapTwelveQuote(q[0], { symbol });
+            _portSelectedMeta = { symbol, name: m.name || name || symbol, sector: null, chgPct: m.chgPct ?? 0, w52h: m.w52h ?? 0, w52l: m.w52l ?? 0, pe: null };
+            updateInvestPreview();
+          }
         } else {
           const tdResult = await fetchTwelveIndia([symbol]);
           const q = tdResult[symbol];
-          if (q) { priceEl.value = q.price.toFixed(2); updateInvestPreview(); }
+          if (q) {
+            priceEl.value = q.price.toFixed(2);
+            _portSelectedMeta = { symbol, name: q.name || name || symbol, sector: null, chgPct: q.chgPct ?? 0, w52h: q.w52h ?? 0, w52l: q.w52l ?? 0, pe: null };
+            updateInvestPreview();
+          }
         }
       } catch {} finally { priceEl.placeholder = ''; }
     }
@@ -1595,13 +1613,10 @@ function getCurrentPrice(holding) {
 }
 
 function getDayChange(holding) {
-  if (holding.market === 'us') {
-    const found = US_STOCKS_DB.find(s => s.symbol === holding.symbol);
-    return found ? found.chgPct : 0;
-  } else {
-    const found = INDIA_STOCKS_DB.find(s => s.symbol === holding.symbol);
-    return found ? found.chgPct : 0;
-  }
+  const db = holding.market === 'us' ? US_STOCKS_DB : INDIA_STOCKS_DB;
+  const found = db.find(s => s.symbol === holding.symbol);
+  if (found) return found.chgPct;
+  return holding.dayChgPct ?? 0;
 }
 
 function renderPortfolio() {
@@ -2180,14 +2195,22 @@ function submitAddStock() {
     existing.currentPrice = getCurrentPrice(existing);
     toast(`Updated ${symbol} — avg price: ${market==='india'?'₹':'$'}${avgPrice.toFixed(2)}`);
   } else {
-    // Seed currentPrice from DB base price if available, else buy price
     const dbRef = (market === 'us' ? US_STOCKS_DB : INDIA_STOCKS_DB).find(s => s.symbol === symbol);
+    const meta = (_portSelectedMeta && _portSelectedMeta.symbol === symbol) ? _portSelectedMeta : {};
     const seedPrice = dbRef ? dbRef.price : buyPrice;
-    const holding = { symbol, name, sector, market, qty, buyPrice, date, currentPrice: seedPrice, dayChgPct: 0 };
+    const holding = {
+      symbol, name, sector, market, qty, buyPrice, date,
+      currentPrice: seedPrice,
+      dayChgPct: dbRef ? (dbRef.chgPct ?? 0) : (meta.chgPct ?? 0),
+      metaW52h: dbRef ? (dbRef.w52h ?? 0) : (meta.w52h ?? 0),
+      metaW52l: dbRef ? (dbRef.w52l ?? 0) : (meta.w52l ?? 0),
+      metaPe:   dbRef ? (dbRef.pe   ?? null) : (meta.pe ?? null),
+    };
     holding.currentPrice = getCurrentPrice(holding);
     state.portfolio.push(holding);
     toast(`Added ${symbol} to portfolio`);
   }
+  _portSelectedMeta = null;
 
   savePortfolio();
   closeModal();
@@ -2641,7 +2664,12 @@ function submitWatchStock() {
   if (targetList.find(w => w.symbol === sym && w.market === market)) {
     toast(`${sym} already in "${targetName}"`); closeWatchModal(); return;
   }
-  targetList.push({ market, symbol: sym, name: found?.name || sym });
+  const snap = found || {};
+  targetList.push({
+    market, symbol: sym, name: found?.name || sym,
+    price: snap.price ?? null, chgPct: snap.chgPct ?? 0, chg: snap.chg ?? 0,
+    w52h: snap.w52h ?? 0, w52l: snap.w52l ?? 0, sector: snap.sector ?? '—', pe: snap.pe ?? null,
+  });
   state.activeWatchlist = targetName;
   saveWatchlists();
   closeWatchModal();
@@ -2658,7 +2686,14 @@ function watchCurrent(market) {
   if (list.find(w => w.symbol === sym && w.market === market)) {
     toast(`${sym} already in "${state.activeWatchlist}"`); return;
   }
-  list.push({ market, symbol: sym, name: stock.name });
+  const db = market === 'us' ? US_STOCKS_DB : INDIA_STOCKS_DB;
+  const dbFound = db.find(s => s.symbol === sym);
+  const snap = dbFound || stock._snap || {};
+  list.push({
+    market, symbol: sym, name: stock.name,
+    price: snap.price ?? null, chgPct: snap.chgPct ?? 0, chg: snap.chg ?? 0,
+    w52h: snap.w52h ?? 0, w52l: snap.w52l ?? 0, sector: snap.sector ?? '—', pe: snap.pe ?? null,
+  });
   saveWatchlists();
   renderWatchlistTabs();
   if (state.section === 'watchlist') renderWatchlist();
@@ -2680,7 +2715,8 @@ function renderWatchlist() {
   grid.innerHTML = list.map((w, i) => {
     const isIndia = w.market === 'india';
     const db = isIndia ? INDIA_STOCKS_DB : US_STOCKS_DB;
-    const found = db.find(s => s.symbol === w.symbol);
+    const dbFound = db.find(s => s.symbol === w.symbol);
+    const found = dbFound || (w.price != null ? w : null);
     const price = found ? found.price : null;
     const chgPct = found ? found.chgPct : 0;
     const priceStr = price == null ? '—' : isIndia ? fmtINR(price) : fmtUSD(price);
@@ -2714,7 +2750,8 @@ function renderWatchlistTable() {
   body.innerHTML = list.map((w, i) => {
     const isIndia = w.market === 'india';
     const db = isIndia ? INDIA_STOCKS_DB : US_STOCKS_DB;
-    const found = db.find(s => s.symbol === w.symbol);
+    const dbFound = db.find(s => s.symbol === w.symbol);
+    const found = dbFound || (w.price != null ? w : null);
     const price = found ? found.price : null;
     const chgPct = found ? found.chgPct : 0;
     const chg = found ? found.chg : 0;
