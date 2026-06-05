@@ -94,6 +94,8 @@ const state = {
   charts: {},
   moversTab: 'gainers',
   portfolioFilter: 'all',
+  pickReportReturn: 'picks',
+  pickReportStock: null,
 };
 
 // ── News state (defined early so renderMovers/renderScreener can access it) ──
@@ -4260,13 +4262,227 @@ function explainScore(s, isIndia) {
   };
 }
 
+// =====================================================================
+// METRIC EXPLANATIONS — educational text + per-stock interpretation
+// =====================================================================
+const METRIC_INFO = {
+  pe: {
+    label: 'P/E Ratio (Price-to-Earnings)',
+    what: 'How many rupees/dollars investors pay for every ₹1/$1 of the company\'s annual earnings. Calculated as: Share Price ÷ Earnings Per Share. It is the single most common gauge of how "expensive" a stock is relative to its profits.',
+    ideal: 'No universal number — it depends on the sector and growth rate. Roughly: under 15 is often "cheap", 15–25 is fair for a steady company, 25–40 implies the market expects strong growth, and above 40 is richly priced (you are paying a lot today for future growth that must materialise).',
+    caveat: 'A low P/E can mean a bargain OR a company in trouble (the market expects earnings to fall). A high P/E is fine for a fast grower but dangerous if growth disappoints. Loss-making companies have no meaningful P/E.',
+    interpret: (s) => {
+      if (!(s.pe > 0)) return 'This stock has no P/E — it is either loss-making or earnings data is unavailable. Valuation must be judged on other metrics such as Price/Sales or Price/Book.';
+      if (s.pe < 8)    return `At ${s.pe.toFixed(1)}, this is deep-value territory — very cheap by earnings, but verify the business is not in structural decline.`;
+      if (s.pe <= 15)  return `At ${s.pe.toFixed(1)}, this is on the lower/cheaper end — potentially undervalued. Check whether earnings are stable or likely to fall.`;
+      if (s.pe <= 25)  return `At ${s.pe.toFixed(1)}, this sits in the fair-value zone for an established, moderately growing company.`;
+      if (s.pe <= 40)  return `At ${s.pe.toFixed(1)}, the market is pricing in solid growth. Justified only if earnings keep compounding.`;
+      return `At ${s.pe.toFixed(1)}, this is richly valued — a lot of future growth is already priced in, leaving little room for any disappointment.`;
+    }
+  },
+  beta: {
+    label: 'Beta (Market Sensitivity)',
+    what: 'Beta measures how much this stock moves relative to the overall market index. A Beta of 1.0 means it moves exactly in line with the index. Above 1 means it amplifies market moves (more volatile); below 1 means it is steadier than the market; negative Beta means it tends to move opposite the market (very rare, e.g. gold miners in some conditions).',
+    ideal: 'Depends on your risk appetite. 0.8–1.1 is a balanced "moves roughly with the market" zone. Below 0.8 = defensive (FMCG, utilities, pharma — good for capital protection in downturns). 1.2–1.5 = moderately aggressive. Above 1.5 = high-octane — big gains in rallies, big losses in crashes.',
+    caveat: 'Beta measures volatility and correlation, NOT quality or future direction. A high-beta stock is not "bad" — it is simply a rougher ride. Beta is calculated on historical data and can shift over time as a company\'s business model changes.',
+    interpret: (s) => {
+      const b = s.beta || 1;
+      if (b < 0.6)      return `At ${b.toFixed(2)}, this is a very defensive stock — it historically moves little relative to the market. Great for capital preservation; limited upside in strong rallies.`;
+      if (b < 0.8)      return `At ${b.toFixed(2)}, this is mildly defensive — expect smaller swings than the index in both directions. Suitable for conservative investors.`;
+      if (b <= 1.1)     return `At ${b.toFixed(2)}, this moves roughly in step with the market — a balanced risk profile. Neither particularly defensive nor aggressive.`;
+      if (b <= 1.4)     return `At ${b.toFixed(2)}, this is moderately aggressive — expect larger swings than the index. Good for growth investors comfortable with volatility.`;
+      if (b <= 1.8)     return `At ${b.toFixed(2)}, this is high-volatility — it will significantly amplify both market rallies and crashes. Size your position carefully.`;
+      return `At ${b.toFixed(2)}, this is extremely volatile — suitable only for high-conviction, short-duration trades with tight risk management.`;
+    }
+  },
+  alpha: {
+    label: 'Alpha (Risk-Adjusted Outperformance)',
+    what: 'Alpha is the return a stock or portfolio delivered ABOVE (or below) what its level of risk (Beta) would predict. If a stock has a Beta of 1.2 and the market returned 10%, the "expected" return for that stock is 12%. If it actually returned 15%, the Alpha is +3%. Positive alpha means the stock beat its risk-adjusted benchmark — it "added value" beyond what the risk implied.',
+    ideal: 'Any positive Alpha is desirable — it means outperformance after accounting for the risk taken. Consistently positive alpha over multiple years is the hallmark of a high-quality business or skilled fund manager. Zero alpha means the stock delivered exactly what its risk profile implied.',
+    caveat: 'Computing Alpha requires a multi-year history of returns regressed against a benchmark index. This terminal does not currently pull historical price series data, so a live Alpha figure cannot be calculated without introducing misleading results. It is listed here for education.',
+    interpret: () => 'Alpha is not calculated in this terminal — it requires a full historical return series regressed against a benchmark (Nifty 50 / S&P 500). Computing it from incomplete data would be misleading. Use a dedicated research platform (e.g. Screener.in for India, Macrotrends for US) for historical Alpha data.'
+  },
+  mcap: {
+    label: 'Market Capitalisation (Company Size)',
+    what: 'The total market value of all outstanding shares: Share Price × Total Shares Outstanding. It represents the market\'s current assessment of the entire company\'s worth. Categories in India: Mega Cap >₹10T, Large Cap ₹3–10T, Mid Cap ₹1–3T, Small Cap <₹1T. In the US: Mega Cap >$500B, Large Cap $100–500B, Mid Cap $20–100B, Small Cap <$20B.',
+    ideal: 'Not inherently good or bad — it is a size indicator. Larger caps are more stable, more liquid, and harder to manipulate. Smaller caps can grow significantly faster but come with higher risk, lower liquidity, and greater volatility.',
+    caveat: 'Size does not equal quality. A mega-cap can be overvalued; a small-cap can be a hidden gem. Market cap changes daily with the share price — a falling cap can trigger forced selling by index funds if a stock drops out of an index.',
+    interpret: (s, isIndia) => {
+      const m = s.mcap || 0;
+      const tier = isIndia
+        ? (m>=10e12?'Mega Cap (>₹10T)':m>=3e12?'Large Cap (₹3–10T)':m>=1e12?'Mid Cap (₹1–3T)':'Small Cap (<₹1T)')
+        : (m>=500e9?'Mega Cap (>$500B)':m>=100e9?'Large Cap ($100–500B)':m>=20e9?'Mid Cap ($20–100B)':'Small Cap (<$20B)');
+      const desc = m>=(isIndia?10e12:500e9)?'Stable, highly liquid, index heavyweight — lower growth potential but strong downside protection.':
+                   m>=(isIndia?3e12:100e9)?'Established company with strong institutional ownership — good balance of stability and growth.':
+                   m>=(isIndia?1e12:20e9)?'Growth potential with moderate risk — watch liquidity and promoter holding.':
+                   'Higher growth potential but elevated risk, lower liquidity, and more volatile price action.';
+      return `At ${fmtMcap(m, isIndia)}, this is a ${tier} company. ${desc}`;
+    }
+  },
+  div: {
+    label: 'Dividend Yield',
+    what: 'The annual cash dividend paid per share, expressed as a percentage of the current share price. Formula: (Annual Dividend Per Share ÷ Share Price) × 100. It is the income you earn from simply holding the stock, entirely separate from any price gains.',
+    ideal: '2–4% is generally a healthy, sustainable yield for an income-oriented stock. Above 5% is attractive but warrants scrutiny — is the payout ratio sustainable? 0% is perfectly normal (and often desirable) for growth companies and most banks/NBFCs that reinvest profits rather than distributing them.',
+    caveat: 'Beware the "yield trap": a very high yield can signal that the share price has already crashed, or that the dividend is about to be cut. A falling share price mathematically pushes up the yield — always check the payout ratio (dividends ÷ earnings). If it exceeds 100%, the company is paying out more than it earns, which is unsustainable.',
+    interpret: (s) => {
+      const d = s.div || 0;
+      if (d === 0) return 'This stock pays no dividend — typical of a high-growth company reinvesting all profits. Your entire return depends on price appreciation.';
+      if (d < 1)   return `At ${d.toFixed(2)}%, this is a token yield — primarily a growth stock that returns a small amount to shareholders.`;
+      if (d < 2)   return `At ${d.toFixed(2)}%, a modest yield — some income, but the main return is expected from price growth.`;
+      if (d <= 4)  return `At ${d.toFixed(2)}%, this is a healthy, sustainable dividend. Good for income investors. Verify the payout ratio is below 80%.`;
+      if (d <= 6)  return `At ${d.toFixed(2)}%, this is a high yield — attractive for income, but check the payout ratio and whether earnings support it.`;
+      return `At ${d.toFixed(2)}%, this is an unusually high yield. It could be a genuine income opportunity OR a warning sign that the share price has fallen sharply. Investigate thoroughly before investing.`;
+    }
+  },
+  range52: {
+    label: '52-Week Price Range',
+    what: 'The highest and lowest closing price the stock has traded at over the past 52 weeks (one year). Where the current price sits within this band provides quick context on recent momentum and potential value. Near the low = possible value or continued decline. Near the high = strong momentum or limited near-term upside.',
+    ideal: 'There is no universally "ideal" position in the range. Value investors often prefer stocks near their 52-week lows (potential bargain); momentum investors prefer stocks near their 52-week highs (strength breeds strength). The key is understanding WHY the stock is where it is.',
+    caveat: 'Position in the 52-week range is a symptom, not a diagnosis. A stock near its low could be a genuine bargain — or it could be in freefall for a fundamental reason (deteriorating earnings, sector headwinds, accounting concerns). Always pair with business analysis.',
+    interpret: (s, isIndia) => {
+      const range = (s.w52h||0)-(s.w52l||0);
+      if (range <= 0) return '52-week range data is unavailable for this stock.';
+      const pos = (s.price - s.w52l)/range*100;
+      const f = isIndia ? fmtINR : fmtUSD;
+      const context = pos<20?'Very near its yearly low — historically a value entry point, but verify the underlying business is intact and the slide has stopped.':
+                      pos<40?'In the lower portion of its yearly range — potential value, but the stock has been under pressure.':
+                      pos<60?'Roughly in the middle of its yearly range — neither a clear value play nor a momentum play.':
+                      pos<80?'In the upper portion of its yearly range — showing relative strength; momentum is with the stock.':
+                      'Near its 52-week high — strong momentum and market confidence, but limited near-term upside cushion.';
+      return `Currently at ${f(s.price)}, which is ${pos.toFixed(0)}% of its 52-week range (${f(s.w52l)} → ${f(s.w52h)}). ${context}`;
+    }
+  },
+  roe: {
+    label: 'ROE — Return on Equity',
+    what: 'How efficiently the company generates profit from shareholders\' invested money. Calculated as: Net Profit ÷ Shareholders\' Equity. If a company has ₹100 crore of equity on its books and earns ₹20 crore, its ROE is 20%. It is one of the best single measures of management quality and business efficiency.',
+    ideal: 'Above 15% is generally considered good. Above 20–25% is excellent and characteristic of high-quality, competitively advantaged businesses (think consumer brands, software, pharma). Below 10% is weak for most sectors.',
+    caveat: 'ROE can be artificially inflated by heavy debt — borrowed money boosts returns but also amplifies risk. Always read ROE alongside the Debt-to-Equity ratio. A 40% ROE funded mostly by debt is far less impressive than a 25% ROE with minimal borrowing.',
+    interpret: (s) => {
+      if (s.avROE == null) return 'ROE data is loading for this stock — check back in a moment.';
+      const r = s.avROE*100;
+      if (r > 30) return `At ${r.toFixed(1)}%, this is outstanding ROE — the company generates exceptional returns on shareholder capital. Verify it is not driven by heavy debt.`;
+      if (r > 20) return `At ${r.toFixed(1)}%, this is excellent — a hallmark of a high-quality business with competitive advantages.`;
+      if (r > 15) return `At ${r.toFixed(1)}%, this is good — management uses capital efficiently above the typical cost of equity.`;
+      if (r > 10) return `At ${r.toFixed(1)}%, this is moderate — acceptable for capital-intensive sectors, but weaker for asset-light businesses.`;
+      if (r > 0)  return `At ${r.toFixed(1)}%, this is on the weaker side — the company generates relatively little profit per rupee of equity.`;
+      return `At ${r.toFixed(1)}%, ROE is negative — the company is eroding shareholder equity, which is a serious concern.`;
+    }
+  },
+  margin: {
+    label: 'Net Profit Margin',
+    what: 'The percentage of total revenue that remains as profit after all costs — including operating expenses, interest, and taxes. Calculated as: Net Profit ÷ Revenue × 100. A 20% margin means the company keeps ₹20 for every ₹100 it earns in revenue.',
+    ideal: 'Highly sector-dependent. Software/SaaS companies often achieve 20–35%. Pharma typically 15–25%. Banks use a different metric (NIM). Retail and FMCG run on 3–8% — that is normal and healthy for them. Industrial/manufacturing: 5–12%. The key is to compare within the same sector.',
+    caveat: 'Never compare margins across sectors — a 5% margin is terrible for a software company but excellent for a grocery retailer. Also watch for one-time items distorting margins (asset sales, write-offs) that inflate or deflate the number artificially.',
+    interpret: (s) => {
+      if (s.avMargin == null) return 'Profit margin data is loading for this stock — check back in a moment.';
+      const m = s.avMargin*100;
+      if (m > 25) return `At ${m.toFixed(1)}%, this is a very strong margin — the company keeps a large share of every sale. Characteristic of strong pricing power or a high-value product.`;
+      if (m > 15) return `At ${m.toFixed(1)}%, this is a healthy margin. The company is profitably converting revenue to earnings.`;
+      if (m > 8)  return `At ${m.toFixed(1)}%, this is a decent margin — solid for most traditional industries.`;
+      if (m > 0)  return `At ${m.toFixed(1)}%, this is a thin margin — normal for retail or commodity businesses; weak for asset-light companies. Monitor for margin compression.`;
+      return `At ${m.toFixed(1)}%, the company is unprofitable on a net basis. Operating losses are being incurred — understand why before investing.`;
+    }
+  },
+  peg: {
+    label: 'PEG Ratio (Price/Earnings-to-Growth)',
+    what: 'The P/E ratio divided by the expected annual earnings growth rate. Formula: P/E ÷ EPS Growth Rate. A stock with a P/E of 30 and 30% earnings growth has a PEG of 1.0. PEG improves on P/E alone by asking: "is the high P/E justified by the growth you are getting?"',
+    ideal: 'Below 1.0 is often cited as "undervalued relative to growth" — you are not paying a full premium for the growth on offer. Around 1.0 is considered fairly valued. Above 2.0 suggests the market is pricing in growth that may not materialise. Popularised by legendary investor Peter Lynch.',
+    caveat: 'PEG is only as good as the growth estimate plugged into it. Analyst growth forecasts are frequently wrong — especially beyond 2 years. A low PEG from an unrealistically high growth assumption is not a genuine bargain. Use it as one data point, not a buy signal in isolation.',
+    interpret: (s) => {
+      if (!(s.avPEG > 0)) return 'PEG ratio data is not available for this stock. It requires both trailing P/E and a forward earnings growth estimate.';
+      if (s.avPEG < 0.75) return `At ${s.avPEG.toFixed(2)}, this looks significantly undervalued relative to its growth rate — a potentially strong signal, but verify the growth estimate is realistic.`;
+      if (s.avPEG < 1.0)  return `At ${s.avPEG.toFixed(2)}, this appears undervalued relative to its growth — the classic Peter Lynch "buy" signal.`;
+      if (s.avPEG < 1.5)  return `At ${s.avPEG.toFixed(2)}, this is fairly valued once growth is factored in — you are paying a modest premium for the expected earnings expansion.`;
+      if (s.avPEG < 2.0)  return `At ${s.avPEG.toFixed(2)}, this is moderately expensive even accounting for growth.`;
+      return `At ${s.avPEG.toFixed(2)}, this is expensive relative to its growth rate — the P/E is high and growth alone does not fully justify it.`;
+    }
+  },
+  eps: {
+    label: 'EPS — Earnings Per Share',
+    what: 'The company\'s total net profit divided by its total number of outstanding shares. It tells you: "for each single share I own, how much profit did the company earn this year?" Formula: Net Profit ÷ Shares Outstanding. A rising EPS over time is one of the strongest indicators of a healthy, growing business.',
+    ideal: 'Positive and consistently growing EPS over multiple years. The absolute number matters less than the trend — a company growing EPS at 15–20% annually is compounding shareholder value powerfully. Flat or declining EPS warrants investigation.',
+    caveat: 'EPS can be boosted artificially through share buybacks — buying back shares reduces the denominator, mathematically raising EPS even without real profit growth. One quarter of EPS tells you very little; look at the 3–5 year trend. Also watch for "adjusted EPS" which strips out one-time charges — the gap between reported and adjusted EPS can reveal management\'s accounting choices.',
+    interpret: (s, isIndia) => {
+      if (s.avEPS == null) return 'EPS data is loading for this stock — check back in a moment.';
+      const f = isIndia ? fmtINR : fmtUSD;
+      if (s.avEPS > 0) return `Trailing twelve-month EPS is ${f(s.avEPS)} per share — the company is profitable. Compare this number against prior years to assess the earnings growth trend, which matters more than the absolute level.`;
+      if (s.avEPS === 0) return 'EPS is at breakeven — the company is covering its costs but generating no surplus profit yet.';
+      return `EPS is ${f(s.avEPS)} — the company is currently loss-making on a per-share basis. Evaluate whether it has a credible path to profitability and whether cash burn is manageable.`;
+    }
+  },
+  ma: {
+    label: 'Moving Averages (50-Day / 200-Day)',
+    what: 'The 50-day moving average (50-DMA) is the average closing price over the last 50 trading days; the 200-DMA is the average over the last 200 days. By smoothing out daily noise, these lines reveal the underlying trend. The 50-DMA tracks the medium-term trend; the 200-DMA tracks the long-term trend. Widely used by both retail and institutional investors as reference points.',
+    ideal: 'Price above 200-DMA = long-term uptrend (bullish). Price below 200-DMA = long-term downtrend (bearish). The "Golden Cross" (50-DMA crossing above 200-DMA) is a classic long-term buy signal. The "Death Cross" (50-DMA crossing below 200-DMA) is a sell/caution signal.',
+    caveat: 'Moving averages are lagging indicators — they confirm a trend only after it has already started. In a choppy, sideways market they generate many false signals. They are most reliable in strongly trending markets. Do not use them as sole entry/exit signals; combine with volume and fundamentals.',
+    interpret: (s, isIndia) => {
+      if (!s.avMA200 && !s.avMA50) return 'Moving average data is loading for this stock — it will appear after the live data fetch completes.';
+      const f = isIndia ? fmtINR : fmtUSD;
+      const parts = [];
+      if (s.avMA200) {
+        const pct = ((s.price - s.avMA200)/s.avMA200*100).toFixed(1);
+        parts.push(`Price ${f(s.price)} is ${s.price > s.avMA200 ? 'ABOVE' : 'BELOW'} the 200-DMA at ${f(s.avMA200)} (${pct > 0 ? '+' : ''}${pct}%) — indicating a long-term ${s.price > s.avMA200 ? 'uptrend' : 'downtrend'}.`);
+      }
+      if (s.avMA50) {
+        parts.push(`It is ${s.price > s.avMA50 ? 'above' : 'below'} the 50-DMA (${f(s.avMA50)}) — ${s.price > s.avMA50 ? 'medium-term momentum is positive' : 'medium-term momentum is negative'}.`);
+      }
+      if (s.avMA50 && s.avMA200) {
+        parts.push(s.avMA50 > s.avMA200 ? 'The 50-DMA is above the 200-DMA — a "Golden Cross" structure, broadly bullish.' : 'The 50-DMA is below the 200-DMA — a "Death Cross" structure, broadly bearish.');
+      }
+      return parts.join(' ');
+    }
+  },
+  volume: {
+    label: 'Volume & Average Volume',
+    what: 'Volume is the number of shares traded in a session. Average volume is the mean daily volume over the past 20–90 days (depending on the data source). Volume is the fuel behind price moves — it measures how much conviction is behind a rally or a sell-off.',
+    ideal: 'No absolute "good" level — what matters is how today\'s volume compares to the average. Volume 50%+ above average on an up day = strong buying conviction, a good sign. Volume 50%+ above average on a down day = strong selling pressure, a bad sign. Volume well below average = weak conviction either way.',
+    caveat: 'High volume is direction-agnostic — it confirms momentum, but does not tell you which direction. A stock crashing on record volume is a warning, not a buying signal. Equally, a small price move on enormous volume can indicate institutional accumulation (good) or distribution (bad) — watch the price direction.',
+    interpret: (s) => {
+      if (!(s.vol > 0) || !(s.avgVol > 0)) return 'Volume data is not available for this stock.';
+      const ratio = s.vol / s.avgVol;
+      const dir = (s.chgPct || 0) >= 0 ? 'up' : 'down';
+      const conv = ratio >= 2 ? 'extremely high — very strong conviction':
+                   ratio >= 1.5 ? 'well above normal — strong conviction':
+                   ratio >= 0.8 ? 'roughly normal':
+                   ratio >= 0.5 ? 'below average — weak conviction':
+                   'very low — very little conviction';
+      return `Today's volume is ${fmtVol(s.vol)} vs a ${fmtVol(s.avgVol)} daily average (${ratio.toFixed(1)}×). This is ${conv} behind today's ${dir} move. ${ratio >= 1.5 && dir === 'up' ? 'High volume on an up day confirms buying interest.' : ratio >= 1.5 && dir === 'down' ? 'High volume on a down day signals significant selling pressure — take caution.' : ratio < 0.5 ? 'Low volume moves are easily reversed when normal trading resumes.' : ''}`;
+    }
+  },
+};
+
+// Toggle an expandable metric explanation panel
+function toggleMetricInfo(key) {
+  const el = document.getElementById('minfo-' + key);
+  if (el) el.classList.toggle('open');
+}
+
+// Build one metric row: value chip + expandable full explanation
+function _metricRow(key, valueHtml, s, isIndia) {
+  const info = METRIC_INFO[key];
+  if (!info) return '';
+  const interp = info.interpret(s, isIndia);
+  return `<div class="rpt-metric">
+    <div class="rpt-metric-head" onclick="toggleMetricInfo('${key}')">
+      <span class="rpt-metric-label">${info.label}</span>
+      <span class="rpt-metric-value">${valueHtml}</span>
+      <button class="rpt-metric-q" title="Full explanation">?</button>
+    </div>
+    <div class="rpt-metric-info" id="minfo-${key}">
+      <p><strong>What it is:</strong> ${info.what}</p>
+      <p><strong>What's a good value:</strong> ${info.ideal}</p>
+      <p><strong>Watch out for:</strong> ${info.caveat}</p>
+      <p class="rpt-metric-interp"><strong>This stock:</strong> ${interp}</p>
+    </div>
+  </div>`;
+}
+
 function closePickReport() {
-  const o = $('pickReportOverlay');
-  if (o) o.className = 'pick-report-overlay';
+  switchSection(state.pickReportReturn || 'picks');
 }
 
 function loadPickInTerminal(symbol, isIndia) {
-  closePickReport();
+  state.navSource = 'picks';
   isIndia ? loadIndiaQuick(symbol) : loadUSQuick(symbol);
 }
 
@@ -4275,86 +4491,89 @@ async function openPickReport(symbol, isIndia) {
   const s = data?.find(x => x.symbol === symbol);
   if (!s) { toast('Pick data unavailable', 'error'); return; }
 
-  const overlay = $('pickReportOverlay');
-  overlay.className = 'pick-report-overlay open';
+  state.pickReportReturn = 'picks';
+  state.pickReportStock  = { symbol, isIndia };
+  switchSection('pick-report');
+
   const body = $('pickReportBody');
   const fmt2 = isIndia ? fmtINR : fmtUSD;
   const sc = s.score;
-  const expl = explainScore(s, isIndia);
+  const reasoning = explainScore(s, isIndia);
 
   // News: live feed first, then fall back to curated NEWS_DB
-  let news = newsState.feed.filter(n => (n.stocks||[]).includes(symbol) && n.market===(isIndia?'india':'us')).slice(0, 5);
+  const inferSrc = h => /fed|rbi|rate|inflation|gdp|cpi/i.test(h) ? 'Reuters' :
+                        /earnings|profit|revenue|PAT|quarterly/i.test(h) ? 'Bloomberg' :
+                        /fda|usfda|drug|pharma/i.test(h) ? 'BioPharma Dive' :
+                        /antitrust|court|probe|fine/i.test(h) ? 'Financial Times' :
+                        isIndia ? 'Economic Times' : 'MarketWatch';
+  let news = newsState.feed.filter(n => (n.stocks||[]).includes(symbol) && n.market===(isIndia?'india':'us')).slice(0, 6);
   if (news.length < 2) {
-    const inferSrc = h => /fed|rbi|rate|inflation|gdp|cpi/i.test(h) ? 'Reuters' :
-                          /earnings|profit|revenue|PAT|quarterly/i.test(h) ? 'Bloomberg' :
-                          /fda|usfda|drug|pharma/i.test(h) ? 'BioPharma Dive' :
-                          /antitrust|court|probe|fine/i.test(h) ? 'Financial Times' :
-                          isIndia ? 'Economic Times' : 'MarketWatch';
     const fallback = NEWS_DB
       .filter(n => n.stocks.includes(symbol) && n.market===(isIndia?'india':'us'))
       .map(n => ({ ...n, ts: Date.now() - n.ageMin * 60 * 1000, source: inferSrc(n.headline) }));
-    news = [...news, ...fallback].slice(0, 5);
+    news = [...news, ...fallback].slice(0, 6);
   }
 
+  const safeSym = symbol.replace(/'/g, "\\'");
+
+  // Score-category block
   const catBlock = (key, label, color) => {
-    const r = expl[key];
-    return `<div class="prpt-cat">
-      <div class="prpt-cat-head">
-        <span class="prpt-cat-name" style="color:${color}">${label}</span>
-        <span class="prpt-cat-score">${r.score}/${r.max}</span>
+    const r = reasoning[key];
+    return `<div class="rpt-cat">
+      <div class="rpt-cat-head">
+        <span class="rpt-cat-name" style="color:${color}">${label}</span>
+        <span class="rpt-cat-score">${r.score}/${r.max}</span>
       </div>
-      <div class="prpt-cat-bar"><div style="width:${(r.score/r.max*100).toFixed(0)}%;background:${color}"></div></div>
-      <ul class="prpt-cat-reasons">${r.reasons.map(x=>`<li>${x}</li>`).join('')}</ul>
+      <div class="rpt-cat-bar"><div style="width:${(r.score/r.max*100).toFixed(0)}%;background:${color}"></div></div>
+      <ul class="rpt-cat-reasons">${r.reasons.map(x=>`<li>${x}</li>`).join('')}</ul>
     </div>`;
   };
 
   const newsHtml = news.length ? news.map(n => {
     const srcUrl = (n.url && n.url.startsWith('http')) ? n.url : (NEWS_SOURCE_URLS[n.source] || '#');
-    return `<div class="prpt-news">
+    return `<div class="rpt-news">
       <span class="news-severity-dot ${n.severity||'medium'}"></span>
       <div>
         <a href="${srcUrl}" target="_blank" rel="noopener noreferrer">${n.headline}</a>
-        <span class="prpt-news-src">${n.source||'Market Wire'} · ${timeAgo(n.ts)}</span>
+        <span class="rpt-news-src">${n.source||'Market Wire'} · ${timeAgo(n.ts)}</span>
       </div>
     </div>`;
-  }).join('') : `<p class="prpt-muted">No recent news tagged for ${symbol}. Check the news feed for macro updates.</p>`;
+  }).join('') : `<p class="rpt-muted">No recent news tagged for ${symbol}. Check the market news feed for macro updates.</p>`;
 
-  const safeSym = symbol.replace(/'/g, "\\'");
+  // Metric rows available immediately (no API call needed)
+  const baseMetrics =
+    _metricRow('pe',      s.pe ? s.pe.toFixed(1) : '—',             s, isIndia) +
+    _metricRow('beta',    s.beta ? s.beta.toFixed(2) : '—',          s, isIndia) +
+    _metricRow('alpha',   '<span class="rpt-na">N/A — see explanation</span>', s, isIndia) +
+    _metricRow('mcap',    fmtMcap(s.mcap, isIndia),                  s, isIndia) +
+    _metricRow('div',     s.div ? s.div.toFixed(2)+'%' : 'Nil',      s, isIndia) +
+    _metricRow('range52', `${fmt2(s.w52l)} – ${fmt2(s.w52h)}`,       s, isIndia) +
+    _metricRow('volume',  s.vol ? fmtVol(s.vol) : '—',               s, isIndia);
 
   body.innerHTML = `
-    <div class="prpt-top">
+    <div class="rpt-top">
       <div>
-        <div class="prpt-sym">${s.symbol} <span class="prpt-flag">${isIndia?'🇮🇳':'🇺🇸'}</span></div>
-        <div class="prpt-name">${s.name}</div>
-        <div class="prpt-sector-badge">${s.sector}</div>
+        <div class="rpt-sym">${s.symbol} <span class="rpt-flag">${isIndia?'🇮🇳':'🇺🇸'}</span></div>
+        <div class="rpt-name">${s.name}</div>
+        <div class="rpt-sector">${s.sector}</div>
       </div>
-      <div class="prpt-rating-wrap">
-        <span class="prpt-rating" style="color:${sc.ratingColor};border-color:${sc.ratingColor}">${sc.rating}</span>
-        <span class="prpt-total">${sc.total.toFixed(1)}<small>/100</small></span>
-      </div>
-    </div>
-
-    <div class="prpt-section">
-      <h4><i class="fa-solid fa-table-cells"></i> Fundamentals</h4>
-      <div class="prpt-fund-grid" id="prptFundGrid">
-        <div class="prpt-fund"><span>Price</span><strong>${fmt2(s.price)}</strong></div>
-        <div class="prpt-fund"><span>P/E (TTM)</span><strong>${s.pe ? s.pe.toFixed(1) : '—'}</strong></div>
-        <div class="prpt-fund"><span>Beta</span><strong>${s.beta ? s.beta.toFixed(2) : '—'}</strong></div>
-        <div class="prpt-fund"><span>Div Yield</span><strong class="${s.div>0?'positive':''}">${s.div ? s.div.toFixed(2)+'%' : 'Nil'}</strong></div>
-        <div class="prpt-fund"><span>Market Cap</span><strong>${fmtMcap(s.mcap, isIndia)}</strong></div>
-        <div class="prpt-fund"><span>52W High</span><strong>${fmt2(s.w52h)}</strong></div>
-        <div class="prpt-fund"><span>52W Low</span><strong>${fmt2(s.w52l)}</strong></div>
-        <div class="prpt-fund"><span>1D Change</span><strong class="${chgClass(s.chgPct)}">${chgSign(s.chgPct)}${(s.chgPct||0).toFixed(2)}%</strong></div>
-        ${s.avHasData && s.avTargetPrice ? `<div class="prpt-fund"><span>Analyst Target</span><strong class="${s.avTargetPrice>s.price?'positive':'negative'}">${fmt2(s.avTargetPrice)}</strong></div>` : ''}
-        ${s.avHasData && s.avForwardPE   ? `<div class="prpt-fund"><span>Forward P/E</span><strong>${s.avForwardPE.toFixed(1)}</strong></div>` : ''}
-        ${s.avHasData && s.avROE   != null ? `<div class="prpt-fund"><span>ROE</span><strong class="${s.avROE>0.15?'positive':''}">${(s.avROE*100).toFixed(1)}%</strong></div>` : ''}
-        ${s.avHasData && s.avMargin != null ? `<div class="prpt-fund"><span>Profit Margin</span><strong class="${s.avMargin>0.15?'positive':''}">${(s.avMargin*100).toFixed(1)}%</strong></div>` : ''}
-        <div class="prpt-fund prpt-loading" id="prptLivePlaceholder"><span>Fetching live financials…</span><i class="fa-solid fa-circle-notch fa-spin" style="margin-left:6px;opacity:.5"></i></div>
+      <div class="rpt-rating-wrap">
+        <span class="rpt-rating" style="color:${sc.ratingColor};border-color:${sc.ratingColor}">${sc.rating}</span>
+        <span class="rpt-total">${sc.total.toFixed(1)}<small>/100</small></span>
+        <span class="rpt-price">${fmt2(s.price)} <span class="${chgClass(s.chgPct)}">${chgSign(s.chgPct)}${(s.chgPct||0).toFixed(2)}%</span></span>
       </div>
     </div>
 
-    <div class="prpt-section">
-      <h4><i class="fa-solid fa-flask"></i> Why This Score</h4>
+    <p class="rpt-hint"><i class="fa-solid fa-circle-info"></i> Tap the <strong>?</strong> next to any metric for a full explanation of what it means, what a good value looks like, and how to read this stock's specific number.</p>
+
+    <div class="rpt-section">
+      <h3><i class="fa-solid fa-table-cells"></i> Fundamentals &amp; Indicators</h3>
+      <div class="rpt-metrics" id="rptMetrics">${baseMetrics}</div>
+      <div class="rpt-live-note" id="rptLiveNote"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading live financials (ROE, margins, PEG, moving averages)…</div>
+    </div>
+
+    <div class="rpt-section">
+      <h3><i class="fa-solid fa-flask"></i> Why This Score (${sc.total.toFixed(1)}/100)</h3>
       ${catBlock('valuation','Valuation','var(--us)')}
       ${catBlock('quality','Quality','var(--green)')}
       ${catBlock('income','Income','var(--yellow)')}
@@ -4362,56 +4581,49 @@ async function openPickReport(symbol, isIndia) {
       ${catBlock('growth','Growth','#bc8cff')}
     </div>
 
-    <div class="prpt-section">
-      <h4><i class="fa-solid fa-bolt"></i> Recent News</h4>
+    <div class="rpt-section">
+      <h3><i class="fa-solid fa-bolt"></i> Recent News</h3>
       ${newsHtml}
     </div>
 
-    <div class="prpt-disclaimer">
-      <i class="fa-solid fa-circle-info" style="margin-right:5px;opacity:.7"></i>
-      Scores are algorithmic, based on quantitative factors only — not investment advice. Always conduct your own research.
+    <div class="rpt-disclaimer">
+      Scores are algorithmic, based on quantitative factors only — not investment advice. Explanations are educational context only. Always conduct your own research before making any investment decision.
     </div>
 
-    <button class="prpt-chart-btn" onclick="loadPickInTerminal('${safeSym}', ${isIndia})">
-      <i class="fa-solid fa-chart-candlestick"></i> Open Chart in Terminal
+    <button class="rpt-chart-btn" onclick="loadPickInTerminal('${safeSym}', ${isIndia})">
+      <i class="fa-solid fa-chart-line"></i> Open Chart in Terminal
     </button>
   `;
 
-  // Async live stats (US only — Twelve Data statistics endpoint is US-centric)
+  // Async live stats enrichment (US only — Twelve Data statistics endpoint)
   if (!isIndia) {
     try {
       const stats = await fetchTwelveStats(symbol);
-      if (!$('pickReportOverlay')?.classList.contains('open')) return;
-      const placeholder = $('prptLivePlaceholder');
-      if (placeholder) placeholder.remove();
+      if (state.pickReportStock?.symbol !== symbol) return; // user navigated away
+      const note = $('rptLiveNote');
       if (stats?.statistics) {
         const m = mapTwelveStats(stats, s);
-        const grid = $('prptFundGrid');
-        if (grid) {
-          const addFund = (label, val, cls='') => {
-            if (val == null) return;
-            const d = document.createElement('div');
-            d.className = 'prpt-fund';
-            d.innerHTML = `<span>${label}</span><strong class="${cls}">${val}</strong>`;
-            grid.appendChild(d);
-          };
-          if (!s.avForwardPE)      addFund('Forward P/E',  m.avForwardPE  != null ? m.avForwardPE.toFixed(1)                  : null);
-          if (!s.avPEG)            addFund('PEG Ratio',    m.avPEG        != null ? m.avPEG.toFixed(2)                        : null);
-          if (!s.avROE)            addFund('ROE',          m.avROE        != null ? (m.avROE*100).toFixed(1)+'%'              : null, (m.avROE||0)>0.15?'positive':'');
-          if (!s.avMargin)         addFund('Profit Margin',m.avMargin     != null ? (m.avMargin*100).toFixed(1)+'%'           : null, (m.avMargin||0)>0.15?'positive':'');
-                                   addFund('EPS (TTM)',    m.avEPS        != null ? fmt2(m.avEPS)                             : null);
-                                   addFund('Rev Growth',  m.avRevenueGrowth != null ? (m.avRevenueGrowth*100).toFixed(1)+'%' : null, (m.avRevenueGrowth||0)>0?'positive':'negative');
-                                   addFund('50-Day MA',   m.avMA50       != null ? fmt2(m.avMA50)                            : null);
-                                   addFund('200-Day MA',  m.avMA200      != null ? fmt2(m.avMA200)                           : null);
+        const metricsEl = $('rptMetrics');
+        if (metricsEl) {
+          const extra =
+            _metricRow('roe',    m.avROE    != null ? (m.avROE*100).toFixed(1)+'%'    : '—', m, isIndia) +
+            _metricRow('margin', m.avMargin != null ? (m.avMargin*100).toFixed(1)+'%' : '—', m, isIndia) +
+            _metricRow('peg',    m.avPEG    ?          m.avPEG.toFixed(2)              : '—', m, isIndia) +
+            _metricRow('eps',    m.avEPS    != null ?  fmt2(m.avEPS)                   : '—', m, isIndia) +
+            _metricRow('ma',     m.avMA200  ?          fmt2(m.avMA200)                 : '—', m, isIndia);
+          metricsEl.insertAdjacentHTML('beforeend', extra);
         }
+        if (note) note.remove();
+      } else if (note) {
+        note.innerHTML = '<span class="rpt-muted">Live financials (ROE, margins, PEG, moving averages) unavailable for this stock.</span>';
       }
     } catch {
-      const placeholder = $('prptLivePlaceholder');
-      if (placeholder) placeholder.innerHTML = '<span class="prpt-muted">Live data unavailable</span>';
+      const note = $('rptLiveNote');
+      if (note) note.innerHTML = '<span class="rpt-muted">Live financials unavailable for this stock.</span>';
     }
   } else {
-    const placeholder = $('prptLivePlaceholder');
-    if (placeholder) placeholder.remove();
+    const note = $('rptLiveNote');
+    if (note) note.remove();
   }
 }
 

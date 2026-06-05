@@ -1110,6 +1110,17 @@
     </div>
   </section>
 
+
+  <!-- =================== PICK REPORT PAGE =================== -->
+  <section class="page" id="pick-report">
+    <div class="page-header">
+      <button class="rpt-back-btn" onclick="closePickReport()">
+        <i class="fa-solid fa-arrow-left"></i> Back to Top Picks
+      </button>
+    </div>
+    <div class="rpt-body" id="pickReportBody"></div>
+  </section>
+
 </main>
 
 <!-- =================== ADD TO PORTFOLIO MODAL =================== -->
@@ -1379,17 +1390,6 @@
       <button class="btn-outline" onclick="downloadImportTemplate()"><i class="fa-solid fa-download"></i> Template</button>
       <button class="btn-primary" id="importConfirmBtn" style="display:none" onclick="confirmImport()"><i class="fa-solid fa-file-import"></i> Import</button>
     </div>
-  </div>
-</div>
-
-<!-- =================== PICK REPORT PANEL =================== -->
-<div class="pick-report-overlay" id="pickReportOverlay" onclick="closePickReport()">
-  <div class="pick-report-panel" onclick="event.stopPropagation()">
-    <div class="pick-report-head">
-      <button class="pick-report-back" onclick="closePickReport()"><i class="fa-solid fa-arrow-left"></i> Back to Picks</button>
-      <button class="pick-report-close" onclick="closePickReport()">×</button>
-    </div>
-    <div class="pick-report-body" id="pickReportBody"></div>
   </div>
 </div>
 
