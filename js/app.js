@@ -960,23 +960,26 @@ function watchTVPrice(containerEl, sym, onPrice) {
   }
 }
 
-function initIndiaChart(symbol) {
+function initIndiaChart(symbol, interval = 'D', range = null) {
   const el = $('tv_india'); if (!el) return;
   el.innerHTML = '';
   if (typeof TradingView === 'undefined') { el.innerHTML='<div style="padding:40px;text-align:center;color:var(--text3)">Loading chart…</div>'; return; }
   try {
-    state.tvIndia = new TradingView.widget({
-      autosize: true, symbol, interval: 'D',
+    const cfg = {
+      autosize: true, symbol, interval,
       timezone: 'Asia/Kolkata', theme: 'dark', style: '1',
       locale: 'en', enable_publishing: false, withdateranges: true,
       hide_side_toolbar: false, allow_symbol_change: false,
       studies: ['RSI@tv-basicstudies','MACD@tv-basicstudies','Volume@tv-basicstudies'],
       container_id: 'tv_india'
-    });
+    };
+    if (range) cfg.range = range;
+    state.tvIndia = new TradingView.widget(cfg);
   } catch(e) { el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3)">Chart unavailable offline</div>'; }
 
   // Extract live price as TradingView renders the chart
   const sym = symbol.replace(/^[^:]+:/, '').toUpperCase();
+
   watchTVPrice(el, sym, ({ price, chgPct }) => {
     if (state.currentIndia?.symbol !== sym) return;
     const found = INDIA_STOCKS_DB.find(s => s.symbol === sym);
@@ -996,6 +999,25 @@ function initIndiaChart(symbol) {
       renderPortfolio();
     }
   });
+}
+
+const _INDIA_TF_MAP = {
+  '1D': { interval: '15', range: '1D'  },
+  '1W': { interval: '60', range: '5D'  },
+  '1M': { interval: 'D',  range: '1M'  },
+  '3M': { interval: 'D',  range: '3M'  },
+  '6M': { interval: 'D',  range: '6M'  },
+  '1Y': { interval: 'W',  range: '12M' },
+  '5Y': { interval: 'M',  range: '60M' },
+};
+
+function setIndiaTF(btn, tf) {
+  document.querySelectorAll('#indiaTFBar .tf-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const { interval, range } = _INDIA_TF_MAP[tf] || { interval: 'D', range: null };
+  const sym = state.currentIndia?.symbol || 'RELIANCE';
+  const ex  = state.indiaExchange || 'BSE';
+  initIndiaChart(`${ex}:${sym}`, interval, range);
 }
 
 // =====================================================================
@@ -3668,10 +3690,13 @@ function scoreStock(s, isIndia) {
 
   // ── INCOME (20 pts) ──────────────────────────────────────────────
   const div = s.div || 0;
+  const isFinanceSector = ['Finance', 'Banking', 'Financial Services'].includes(s.sector);
   if      (div >= 5)  { pts.income += 20; tags.push('High Yield'); }
   else if (div >= 3)  { pts.income += 15; tags.push('Good Yield'); }
   else if (div >= 2)  { pts.income += 11; tags.push('Dividend'); }
   else if (div >= 0.5){ pts.income +=  6; tags.push('Small Yield'); }
+  else if (isFinanceSector && s.pe > 0 && s.pe < 20) { pts.income += 10; tags.push('Earnings-Driven'); }
+  else if (isFinanceSector)                           { pts.income +=  7; tags.push('Reinvests Earnings'); }
 
   // ── MOMENTUM (15 pts) ─────────────────────────────────────────────
   const chgPct = s.chgPct || 0;
@@ -3731,6 +3756,8 @@ function scoreStock(s, isIndia) {
   if (pts.income >= 11 && div >= 2) cat = 'income';
   else if (pts.valuation >= 18 && s.pe > 0 && s.pe <= 25) cat = 'value';
   else if ((pts.growth >= 7 || pts.momentum >= 11) && pts.quality >= 7) cat = 'growth';
+  else if (s.pe > 0 && s.pe < 25 && pts.quality >= 7) cat = 'profitability';
+  else if (beta < 0.8 && pts.quality >= 7) cat = 'debt';
 
   return { total, pts, tags: [...new Set(tags)].slice(0, 6), rating, ratingCls, ratingColor, cat };
 }
@@ -3926,12 +3953,12 @@ function renderPicks() {
 
     // Mini score bar rows
     const ptsRows = [
-      { label:'Valuation', val: sc.pts.valuation, max: 30, color:'var(--us)' },
-      { label:'Quality',   val: sc.pts.quality,   max: 25, color:'var(--green)' },
-      { label:'Income',    val: sc.pts.income,    max: 20, color:'var(--yellow)' },
-      { label:'Momentum',  val: sc.pts.momentum,  max: 15, color:'var(--india)' },
-      { label:'Growth',    val: sc.pts.growth,    max: 10, color:'#bc8cff' },
-    ].map(r => `<div class="pick-pts-row">
+      { label:'Valuation', val: sc.pts.valuation, max: 30, color:'var(--us)',     tip:'P/E ratio vs benchmark · 52-week price position' },
+      { label:'Quality',   val: sc.pts.quality,   max: 25, color:'var(--green)',  tip:'Market-cap tier · Beta stability · Trading liquidity' },
+      { label:'Income',    val: sc.pts.income,    max: 20, color:'var(--yellow)', tip:'Dividend yield · Finance sector: scored on low P/E earnings quality' },
+      { label:'Momentum',  val: sc.pts.momentum,  max: 15, color:'var(--india)',  tip:'1-day price change direction & magnitude' },
+      { label:'Growth',    val: sc.pts.growth,    max: 10, color:'#bc8cff',       tip:'Proximity to 52W high · Analyst upside target · EPS growth' },
+    ].map(r => `<div class="pick-pts-row" title="${r.tip}">
       <span>${r.label}</span>
       <div class="mini-bar"><div style="width:${Math.round(r.val/r.max*100)}%;background:${r.color}"></div></div>
       <span>${r.val}/${r.max}</span>
@@ -3952,7 +3979,7 @@ function renderPicks() {
         </div>
         <div class="pick-rating-block">
           <span class="pick-rating" style="color:${sc.ratingColor};border-color:${sc.ratingColor}">${sc.rating}</span>
-          <span class="pick-score">${sc.total}<small>/100</small></span>
+          <span class="pick-score">${sc.total.toFixed(1)}<small>/100</small></span>
         </div>
       </div>
 
