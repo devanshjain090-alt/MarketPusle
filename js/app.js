@@ -5646,28 +5646,28 @@ const _smUSEntities = [
   'Point72 Asset Mgmt', 'Coatue Management', 'Tiger Global Mgmt',
 ];
 
-// Source pools keyed by deal type — each URL opens the specific deals section directly
-const _smSourcesByType = {
-  block: [
-    { name: 'NSE India',    url: 'https://www.nseindia.com/market-data/block-deal' },
-    { name: 'BSE India',    url: 'https://www.bseindia.com/corporates/Blk_Deal.aspx' },
-    { name: 'Moneycontrol', url: 'https://www.moneycontrol.com/stocks/marketinfo/block_deals/index.php' },
-    { name: 'Economic Times', url: 'https://economictimes.indiatimes.com/markets/stocks/block-deals/blockdeals.cms' },
-  ],
-  bulk: [
-    { name: 'NSE India',    url: 'https://www.nseindia.com/market-data/bulk-deal' },
-    { name: 'BSE India',    url: 'https://www.bseindia.com/corporates/bulk_deal.aspx' },
-    { name: 'Moneycontrol', url: 'https://www.moneycontrol.com/stocks/marketinfo/bulk_deals/index.php' },
-    { name: 'Economic Times', url: 'https://economictimes.indiatimes.com/markets/stocks/bulk-deals/bulkdeals.cms' },
-  ],
-  darkpool: [
-    { name: 'FINRA OTC',    url: 'https://otcdata.finra.org/' },
-    { name: 'Cboe',         url: 'https://www.cboe.com/us/equities/market_statistics/block_sales/' },
-    { name: 'SEC 13F',      url: 'https://efts.sec.gov/LATEST/search-index?forms=13F-HR&dateRange=custom&startdt=2025-01-01' },
-    { name: 'Bloomberg',    url: 'https://www.bloomberg.com/markets/funds' },
-    { name: 'Reuters',      url: 'https://www.reuters.com/markets/funds/' },
-  ],
-};
+// Each source entry carries per-type URLs — block/bulk for India, darkpool for US.
+// _smGenerateDeal resolves the right URL for each deal's type at generation time.
+const _smIndiaSources = [
+  { name: 'NSE India',
+    block: 'https://www.nseindia.com/market-data/block-deal',
+    bulk:  'https://www.nseindia.com/market-data/bulk-deals' },
+  { name: 'BSE India',
+    block: 'https://www.bseindia.com/markets/equity/EQReports/blockdeals.aspx',
+    bulk:  'https://www.bseindia.com/markets/equity/EQReports/bulkdeals.aspx' },
+  { name: 'Moneycontrol',
+    block: 'https://www.moneycontrol.com/stocks/marketstats/bulk-deals/',
+    bulk:  'https://www.moneycontrol.com/stocks/marketstats/bulk-deals/' },
+  { name: 'Economic Times',
+    block: 'https://economictimes.indiatimes.com/markets/bulk-block-deals',
+    bulk:  'https://economictimes.indiatimes.com/markets/bulk-block-deals' },
+];
+
+const _smUSSourcesPool = [
+  { name: 'FINRA',   darkpool: 'https://otctransparency.finra.org/otctransparency/AtsIssueData' },
+  { name: 'SEC.gov', darkpool: 'https://efts.sec.gov/LATEST/search-index?forms=13F-HR' },
+  { name: 'Cboe',    darkpool: 'https://www.cboe.com/us/equities/market_statistics/' },
+];
 
 function _smRi(min, max) { return Math.floor(Math.random() * (max - min) + min); }
 function _smRf(min, max) { return Math.random() * (max - min) + min; }
@@ -5698,7 +5698,10 @@ function _smGenerateDeal(isNew) {
   const t = new Date(Date.now() - minutesAgo * 60000);
   const timeStr = String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0');
 
-  const source = _smPick(_smSourcesByType[type] || _smSourcesByType.bulk);
+  const sourcePool = isIndia ? _smIndiaSources : _smUSSourcesPool;
+  const picked = _smPick(sourcePool);
+  const url = picked[type] || picked.block || picked.bulk || picked.darkpool || '#';
+  const source = { name: picked.name, url };
 
   return { id: Date.now() + Math.random(), timeStr, timeMs: t.getTime(), market, type, sym: stock.sym, name: stock.name, sector: stock.sector, side, entity, qty, price, value, source, isNew };
 }
