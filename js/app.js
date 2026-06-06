@@ -5648,6 +5648,7 @@ const _smUSEntities = [
 
 // Each source entry carries per-type URLs — block/bulk for India, darkpool for US.
 // _smGenerateDeal resolves the right URL for each deal's type at generation time.
+// India — official exchange sources only (NSE & BSE publish bulk/block deal data publicly)
 const _smIndiaSources = [
   { name: 'NSE India',
     block: 'https://www.nseindia.com/market-data/block-deal',
@@ -5655,14 +5656,9 @@ const _smIndiaSources = [
   { name: 'BSE India',
     block: 'https://www.bseindia.com/markets/equity/EQReports/blockdeals.aspx',
     bulk:  'https://www.bseindia.com/markets/equity/EQReports/bulkdeals.aspx' },
-  { name: 'Moneycontrol',
-    block: 'https://www.moneycontrol.com/stocks/marketstats/bulk-deals/',
-    bulk:  'https://www.moneycontrol.com/stocks/marketstats/bulk-deals/' },
-  { name: 'Economic Times',
-    block: 'https://economictimes.indiatimes.com/markets/bulk-block-deals',
-    bulk:  'https://economictimes.indiatimes.com/markets/bulk-block-deals' },
 ];
 
+// US — official regulatory sources for dark pool / institutional flow data
 const _smUSSourcesPool = [
   { name: 'FINRA',   darkpool: 'https://otctransparency.finra.org/otctransparency/AtsIssueData' },
   { name: 'SEC.gov', darkpool: 'https://efts.sec.gov/LATEST/search-index?forms=13F-HR' },
