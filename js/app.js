@@ -5743,33 +5743,120 @@ function smDrillDown(query) {
   document.getElementById('smHistorySummary')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-function initSmartMoney() {
+// Fetch today's real NSE bulk + block deals via the /api/nsedeals serverless endpoint.
+// Maps NSE's field names into the existing deal-row shape so renderSmartMoney needs no changes.
+// Fails silently — if NSE blocks the request, the synthetic India deals already in the list remain.
+async function fetchRealIndiaDeals() {
+  const out = [];
+  for (const type of ['bulk', 'block']) {
+    try {
+      const r = await fetch(`/api/nsedeals?type=${type}`);
+      if (!r.ok) continue;
+      const json = await r.json();
+      const rows = Array.isArray(json.data) ? json.data : [];
+      rows.forEach(row => {
+        const sym   = (row.BD_SYMBOL   || row.symbol   || '').toUpperCase().trim();
+        const name  =  row.BD_COMP_NAME || row.BD_SYMBOL || sym;
+        const qty   = parseInt(String(row.BD_QTY_TRD  || row.quantity || '0').replace(/,/g, '')) || 0;
+        const price = parseFloat(String(row.BD_TP_WATP || row.price    || '0').replace(/,/g, '')) || 0;
+        const side  = /buy/i.test(row.BD_BUY_SELL || row.buySell || '') ? 'buy' : 'sell';
+        if (!sym || !(price > 0) || !(qty > 0)) return;
+
+        // Parse trade time if available, else use current time
+        let timeMs = Date.now();
+        let timeStr = '—';
+        if (row.BD_DT_DATE) {
+          const parsed = new Date(row.BD_DT_DATE);
+          if (!isNaN(parsed)) { timeMs = parsed.getTime(); }
+        }
+
+        out.push({
+          id: `nse-${type}-${sym}-${row.BD_CLIENT_NAME || ''}-${side}`,
+          timeStr, timeMs,
+          market: 'india',
+          type:   type === 'block' ? 'block' : 'bulk',
+          sym, name, sector: '—',
+          side,
+          entity: row.BD_CLIENT_NAME || row.clientName || 'Institutional',
+          qty, price, value: qty * price,
+          source: {
+            name: 'NSE India',
+            url: type === 'block'
+              ? 'https://www.nseindia.com/market-data/block-deal'
+              : 'https://www.nseindia.com/market-data/bulk-deals',
+          },
+          isNew: false, isReal: true,
+        });
+      });
+    } catch { /* silent — synthetic deals are the fallback */ }
+  }
+  return out;
+}
+
+async function initSmartMoney() {
   if (!smartMoney.initialized) {
+    // Seed with US synthetic deals only — India will come from the real NSE feed
     const batch = [];
-    for (let i = 0; i < 50; i++) batch.push(_smGenerateDeal(false));
+    for (let i = 0; i < 30; i++) {
+      const d = _smGenerateDeal(false);
+      if (d.market === 'us') batch.push(d);
+    }
     batch.sort((a, b) => b.timeMs - a.timeMs);
     smartMoney.deals = batch;
     smartMoney.initialized = true;
+    renderSmartMoney();
+
+    // Overlay real NSE India deals (async — won't block the initial render)
+    const indiaDeals = await fetchRealIndiaDeals();
+    if (indiaDeals.length) {
+      smartMoney.deals = [...indiaDeals, ...smartMoney.deals]
+        .sort((a, b) => b.timeMs - a.timeMs);
+      renderSmartMoney();
+    }
+  } else {
+    renderSmartMoney();
   }
-  renderSmartMoney();
   if (smartMoney.interval) clearInterval(smartMoney.interval);
   smartMoney.interval = setInterval(() => refreshSmartMoney(false), 30000);
 }
 
 function refreshSmartMoney(manual) {
-  const n = _smRi(2, 7);
+  // Auto-refresh: add a few new US synthetic deals only
+  const n = _smRi(2, 6);
   const fresh = [];
-  for (let i = 0; i < n; i++) fresh.push(_smGenerateDeal(true));
+  for (let i = 0; i < n; i++) {
+    const d = _smGenerateDeal(true);
+    if (d.market === 'us') fresh.push(d);
+  }
   smartMoney.deals = [...fresh, ...smartMoney.deals].slice(0, 250);
   setTimeout(() => { smartMoney.deals.forEach(d => { d.isNew = false; }); }, 4000);
   renderSmartMoney();
+
   if (manual) {
     const btn = document.getElementById('smRefreshBtn');
     if (btn) {
       btn.disabled = true;
       btn.innerHTML = '<i class="fa-solid fa-rotate fa-spin"></i> Refreshing…';
-      setTimeout(() => { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Refresh'; }, 900);
     }
+    // On manual refresh, re-pull real NSE India deals
+    fetchRealIndiaDeals().then(indiaDeals => {
+      if (indiaDeals.length) {
+        const usDeals = smartMoney.deals.filter(d => d.market === 'us');
+        smartMoney.deals = [...indiaDeals, ...usDeals]
+          .sort((a, b) => b.timeMs - a.timeMs)
+          .slice(0, 250);
+        renderSmartMoney();
+      }
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Refresh';
+      }
+    }).catch(() => {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Refresh';
+      }
+    });
   }
 }
 
