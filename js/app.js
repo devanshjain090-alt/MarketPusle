@@ -4538,13 +4538,32 @@ async function searchStockReport(rawInput) {
     </div>`;
 
   try {
-    // Twelve Data uses SYMBOL.NSE / SYMBOL.BSE for Indian stocks
-    const tdSym = isIndia && !sym.includes('.') ? `${sym}.NSE` : sym;
+    // For Indian stocks try NSE first, then fall back to BSE
+    const baseSym = sym.replace(/\.(NSE|BSE)$/i, '');
+    let tdSym = sym;
+    let qRes = null, stRes = null;
 
-    const [qRes, stRes] = await Promise.all([
-      fetch(`${TD_BASE}/quote?symbol=${encodeURIComponent(tdSym)}&apikey=${TD_KEY}`).then(r => r.json()).catch(() => null),
-      fetch(`${TD_BASE}/statistics?symbol=${encodeURIComponent(tdSym)}&apikey=${TD_KEY}`).then(r => r.json()).catch(() => null),
-    ]);
+    if (isIndia) {
+      const tryFetch = async (suffix) => {
+        const s = `${baseSym}.${suffix}`;
+        const q = await fetch(`${TD_BASE}/quote?symbol=${encodeURIComponent(s)}&apikey=${TD_KEY}`).then(r => r.json()).catch(() => null);
+        return (q && q.status !== 'error' && q.close) ? { q, sym: s } : null;
+      };
+      const nse = await tryFetch('NSE');
+      if (nse) { tdSym = nse.sym; qRes = nse.q; }
+      else {
+        const bse = await tryFetch('BSE');
+        if (bse) { tdSym = bse.sym; qRes = bse.q; }
+      }
+      if (qRes) {
+        stRes = await fetch(`${TD_BASE}/statistics?symbol=${encodeURIComponent(tdSym)}&apikey=${TD_KEY}`).then(r => r.json()).catch(() => null);
+      }
+    } else {
+      [qRes, stRes] = await Promise.all([
+        fetch(`${TD_BASE}/quote?symbol=${encodeURIComponent(sym)}&apikey=${TD_KEY}`).then(r => r.json()).catch(() => null),
+        fetch(`${TD_BASE}/statistics?symbol=${encodeURIComponent(sym)}&apikey=${TD_KEY}`).then(r => r.json()).catch(() => null),
+      ]);
+    }
 
     // If user navigated away while fetching, abort
     if (state.pickReportStock?.symbol !== sym) return;
@@ -4555,7 +4574,7 @@ async function searchStockReport(rawInput) {
       if (body) body.innerHTML = `
         <div class="empty-state" style="padding:60px 20px">
           <i class="fa-solid fa-circle-exclamation" style="font-size:2.5rem;color:var(--red)"></i>
-          <p style="margin-top:16px">No data found for <strong>${sym}</strong>${isIndia ? ' on NSE' : ''}.<br>
+          <p style="margin-top:16px">No data found for <strong>${sym}</strong>${isIndia ? ' on NSE or BSE' : ''}.<br>
           <span style="font-size:0.85rem;color:var(--text3)">Check the symbol spelling and make sure the correct market (US / India) is selected in Top Picks.</span></p>
           <button class="btn-outline" style="margin-top:20px" onclick="switchSection('picks')">
             <i class="fa-solid fa-arrow-left"></i> Back to Picks
