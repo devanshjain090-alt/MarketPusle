@@ -799,12 +799,12 @@ function mergeAVOverview(ov, stock) {
 // INDEX CARDS & TOPBAR PILLS
 // =====================================================================
 const INDEX_MAP = {
-  sp500:    { sym:'^GSPC',  display:'S&P 500',   base:5127.79, isIndia:false },
-  nasdaq:   { sym:'^IXIC',  display:'NASDAQ',    base:16274.5, isIndia:false },
-  dow:      { sym:'^DJI',   display:'DOW',       base:38503.2, isIndia:false },
-  nifty:    { sym:'^NSEI',  display:'NIFTY 50',  base:22530.7, isIndia:true  },
-  sensex:   { sym:'^BSESN', display:'SENSEX',    base:74105.8, isIndia:true  },
-  bnifty:   { sym:'^NSEBANK',display:'BANK NIFTY',base:48236.4,isIndia:true  },
+  sp500:    { sym:'^GSPC',   display:'S&P 500',    base:5900,   isIndia:false },
+  nasdaq:   { sym:'^IXIC',   display:'NASDAQ',     base:19200,  isIndia:false },
+  dow:      { sym:'^DJI',    display:'DOW JONES',  base:43500,  isIndia:false },
+  nifty:    { sym:'^NSEI',   display:'NIFTY 50',   base:24800,  isIndia:true  },
+  sensex:   { sym:'^BSESN',  display:'SENSEX',     base:81500,  isIndia:true  },
+  bnifty:   { sym:'^NSEBANK',display:'BANK NIFTY', base:52000,  isIndia:true  },
 };
 
 const indexState = {};
@@ -877,21 +877,38 @@ const INDEX_YAHOO_MAP = {
 };
 
 async function fetchIndexPrices() {
-  try {
-    const results = await fetchYahoo(Object.keys(INDEX_YAHOO_MAP));
-    if (!results.length) return;
-    results.forEach(q => {
-      const key = INDEX_YAHOO_MAP[q.symbol];
-      if (!key || !(q.regularMarketPrice > 0)) return;
-      indexState[key] = {
-        price:  q.regularMarketPrice,
-        chg:    q.regularMarketChange          ?? 0,
-        chgPct: q.regularMarketChangePercent   ?? 0,
-      };
-    });
-    updateTopPills();
-    updateIndexCards();
-  } catch {}
+  const ySyms  = Object.keys(INDEX_YAHOO_MAP);
+  const fields = 'regularMarketPrice,regularMarketChange,regularMarketChangePercent';
+  const direct = `https://query2.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(ySyms.join(','))}&fields=${fields}`;
+  const urls   = [
+    direct,
+    `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(ySyms.join(','))}&fields=${fields}`,
+    `https://corsproxy.io/?${encodeURIComponent(direct)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(direct)}`,
+  ];
+
+  for (const url of urls) {
+    try {
+      const r = await fetch(url, { headers: { Accept: 'application/json' } });
+      if (!r.ok) continue;
+      const data = await r.json();
+      const results = data?.quoteResponse?.result || [];
+      if (!results.length) continue;
+
+      let updated = false;
+      results.forEach(q => {
+        const key = INDEX_YAHOO_MAP[q.symbol];
+        if (!key || !(q.regularMarketPrice > 0)) return;
+        indexState[key] = {
+          price:  q.regularMarketPrice,
+          chg:    q.regularMarketChange        ?? 0,
+          chgPct: q.regularMarketChangePercent ?? 0,
+        };
+        updated = true;
+      });
+      if (updated) { updateTopPills(); updateIndexCards(); return; }
+    } catch {}
+  }
 }
 
 // Fetch live index prices immediately, then refresh every 5 minutes

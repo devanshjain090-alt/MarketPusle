@@ -603,10 +603,11 @@ body.sidebar-rail .nav-item[data-label]:hover::after {
   display: flex; justify-content: space-between; align-items: center;
   border-left: 2px solid rgba(200,169,110,0.4);
   transition: var(--transition);
-  cursor: default;
+  cursor: pointer;
 }
-.index-card:hover { border-color: var(--border-hover); background: var(--bg3); transform: translateY(-1px); }
+.index-card:hover { border-color: var(--gold); background: var(--bg3); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
 .index-card.india { border-left-color: rgba(196,132,90,0.5); }
+.index-card.india:hover { border-color: var(--india); }
 
 .icard-left { display: flex; align-items: center; gap: 8px; }
 .icard-flag { font-size: 17px; }
