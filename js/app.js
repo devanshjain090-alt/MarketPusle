@@ -866,106 +866,124 @@ const INDEX_TV = {
   bnifty: { sym: 'NSE:BANKNIFTY', tz: 'Asia/Kolkata'     },
 };
 
-// Yahoo Finance symbols mapped to indexState keys
-const INDEX_YAHOO_MAP = {
-  '^GSPC':  'sp500',
-  '^IXIC':  'nasdaq',
-  '^DJI':   'dow',
-  '^NSEI':  'nifty',
-  '^BSESN': 'sensex',
-  '^NSEBANK':'bnifty',
-};
-
+// ── Index price fetch ─────────────────────────────────────────────────
+// US: Alpha Vantage GLOBAL_QUOTE (CORS-safe, no proxy needed)
+// India: Yahoo Finance with proxy fallback
 async function fetchIndexPrices() {
-  const ySyms  = Object.keys(INDEX_YAHOO_MAP);
-  const fields = 'regularMarketPrice,regularMarketChange,regularMarketChangePercent';
-  const direct = `https://query2.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(ySyms.join(','))}&fields=${fields}`;
-  const urls   = [
-    direct,
-    `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(ySyms.join(','))}&fields=${fields}`,
-    `https://corsproxy.io/?${encodeURIComponent(direct)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(direct)}`,
-  ];
+  const n = v => { const f = parseFloat(v); return isNaN(f) ? 0 : f; };
 
-  for (const url of urls) {
+  // ── US indexes via Alpha Vantage ──────────────────────────────────
+  const usIndex = { sp500: '^GSPC', nasdaq: '^IXIC', dow: '^DJI' };
+  await Promise.all(Object.entries(usIndex).map(async ([key, sym]) => {
+    try {
+      const url = `${AV_BASE}?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(sym)}&apikey=${AV_KEY}`;
+      const r   = await fetch(url);
+      if (!r.ok) return;
+      const data = await r.json();
+      const q    = data?.['Global Quote'];
+      if (!q?.['05. price']) return;
+      const price  = n(q['05. price']);
+      const chg    = n(q['09. change']);
+      const chgPct = n((q['10. change percent'] || '0').replace('%', ''));
+      if (price > 0) indexState[key] = { price, chg, chgPct };
+    } catch {}
+  }));
+
+  // ── India indexes via Yahoo Finance + proxy fallback ──────────────
+  const inSyms   = ['^NSEI', '^BSESN', '^NSEBANK'];
+  const inKeyMap = { '^NSEI': 'nifty', '^BSESN': 'sensex', '^NSEBANK': 'bnifty' };
+  const fields   = 'regularMarketPrice,regularMarketChange,regularMarketChangePercent';
+  const base     = `https://query2.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(inSyms.join(','))}&fields=${fields}`;
+  const proxyUrls = [
+    base,
+    base.replace('query2', 'query1'),
+    `https://corsproxy.io/?${encodeURIComponent(base)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(base)}`,
+  ];
+  for (const url of proxyUrls) {
     try {
       const r = await fetch(url, { headers: { Accept: 'application/json' } });
       if (!r.ok) continue;
-      const data = await r.json();
+      const data    = await r.json();
       const results = data?.quoteResponse?.result || [];
       if (!results.length) continue;
-
-      let updated = false;
       results.forEach(q => {
-        const key = INDEX_YAHOO_MAP[q.symbol];
+        const key = inKeyMap[q.symbol];
         if (!key || !(q.regularMarketPrice > 0)) return;
         indexState[key] = {
           price:  q.regularMarketPrice,
           chg:    q.regularMarketChange        ?? 0,
           chgPct: q.regularMarketChangePercent ?? 0,
         };
-        updated = true;
       });
-      if (updated) { updateTopPills(); updateIndexCards(); return; }
+      break;
     } catch {}
   }
+
+  updateTopPills();
+  updateIndexCards();
 }
 
-// Fetch live index prices immediately, then refresh every 5 minutes
 fetchIndexPrices();
 setInterval(fetchIndexPrices, 5 * 60 * 1000);
 
 // ── Index Chart Modal ─────────────────────────────────────────────────
+let _idxChartSeq = 0; // ensures a unique container ID every open — avoids TradingView reuse bugs
+
 function openIndexChart(key) {
-  const m   = INDEX_MAP[key];
-  const tv  = INDEX_TV[key];
-  const s   = indexState[key];
+  const m  = INDEX_MAP[key];
+  const tv = INDEX_TV[key];
+  const s  = indexState[key];
   if (!m || !tv) return;
 
-  const modal = $('indexChartModal');
-  const fmt   = m.isIndia ? _fmtIN1 : _fmtUS2;
-
+  const fmt = m.isIndia ? _fmtIN1 : _fmtUS2;
   $('idxChartName').textContent  = m.display;
   $('idxChartPrice').textContent = s ? fmt.format(s.price) : '—';
   const chgEl = $('idxChartChg');
   if (s) {
-    chgEl.textContent  = `${chgSign(s.chg)}${s.chgPct.toFixed(2)}%`;
-    chgEl.className    = 'idx-chart-chg ' + chgClass(s.chg);
+    chgEl.textContent = `${chgSign(s.chg)}${s.chgPct.toFixed(2)}%`;
+    chgEl.className   = 'idx-chart-chg ' + chgClass(s.chg);
   } else {
     chgEl.textContent = '';
   }
 
-  modal.classList.add('open');
+  $('indexChartModal').classList.add('open');
 
-  const container = $('indexChartContainer');
-  container.innerHTML = '';
-  if (typeof TradingView !== 'undefined') {
-    try {
-      new TradingView.widget({
-        autosize: true,
-        symbol:   tv.sym,
-        interval: 'D',
-        timezone: tv.tz,
-        theme: 'dark', style: '1',
-        locale: 'en',
-        enable_publishing: false,
-        withdateranges: true,
-        hide_side_toolbar: false,
-        allow_symbol_change: false,
-        studies: ['RSI@tv-basicstudies','MACD@tv-basicstudies','Volume@tv-basicstudies'],
-        container_id: 'indexChartContainer',
-      });
-    } catch {
-      container.innerHTML = '<div style="padding:60px;text-align:center;color:var(--text3)">Chart unavailable</div>';
-    }
-  } else {
-    container.innerHTML = '<div style="padding:60px;text-align:center;color:var(--text3)">Loading chart…</div>';
+  // Fresh div with a unique ID so TradingView always gets a clean container
+  const wrapper = $('indexChartContainer');
+  wrapper.innerHTML = '';
+  const cid = `idxTVChart_${++_idxChartSeq}`;
+  const div = document.createElement('div');
+  div.id = cid;
+  div.style.cssText = 'width:100%;height:100%';
+  wrapper.appendChild(div);
+
+  if (typeof TradingView === 'undefined') {
+    wrapper.innerHTML = '<div style="padding:60px;text-align:center;color:var(--text3)">Chart library loading — try again in a moment</div>';
+    return;
+  }
+  try {
+    new TradingView.widget({
+      autosize: true,
+      symbol:   tv.sym,
+      interval: 'D',
+      timezone: tv.tz,
+      theme: 'dark', style: '1',
+      locale: 'en',
+      enable_publishing: false,
+      withdateranges: true,
+      hide_side_toolbar: false,
+      allow_symbol_change: false,
+      studies: ['RSI@tv-basicstudies','MACD@tv-basicstudies','Volume@tv-basicstudies'],
+      container_id: cid,
+    });
+  } catch {
+    wrapper.innerHTML = '<div style="padding:60px;text-align:center;color:var(--text3)">Chart unavailable</div>';
   }
 }
 
 function closeIndexChart() {
-  const modal = $('indexChartModal');
-  modal.classList.remove('open');
+  $('indexChartModal').classList.remove('open');
   $('indexChartContainer').innerHTML = '';
 }
 
