@@ -4486,10 +4486,89 @@ function loadPickInTerminal(symbol, isIndia) {
   isIndia ? loadIndiaQuick(symbol) : loadUSQuick(symbol);
 }
 
-async function openPickReport(symbol, isIndia) {
-  const data = isIndia ? picksState.india : picksState.us;
-  const s = data?.find(x => x.symbol === symbol);
-  if (!s) { toast('Pick data unavailable', 'error'); return; }
+// Search any stock from the picks search bar and open its report page
+async function searchStockReport(rawInput) {
+  const sym = (rawInput || '').trim().toUpperCase();
+  if (!sym) { toast('Enter a stock symbol to search', 'warn'); return; }
+
+  const isIndia = picksState.market === 'india';
+
+  // Show loading immediately
+  state.pickReportReturn = 'picks';
+  state.pickReportStock  = { symbol: sym, isIndia };
+  switchSection('pick-report');
+  const body = $('pickReportBody');
+  if (body) body.innerHTML = `
+    <div class="rpt-search-loading">
+      <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>
+      <p>Fetching data for <strong>${sym}</strong>…</p>
+    </div>`;
+
+  try {
+    // Twelve Data uses SYMBOL.NSE / SYMBOL.BSE for Indian stocks
+    const tdSym = isIndia && !sym.includes('.') ? `${sym}.NSE` : sym;
+
+    const [qRes, stRes] = await Promise.all([
+      fetch(`${TD_BASE}/quote?symbol=${encodeURIComponent(tdSym)}&apikey=${TD_KEY}`).then(r => r.json()).catch(() => null),
+      fetch(`${TD_BASE}/statistics?symbol=${encodeURIComponent(tdSym)}&apikey=${TD_KEY}`).then(r => r.json()).catch(() => null),
+    ]);
+
+    // If user navigated away while fetching, abort
+    if (state.pickReportStock?.symbol !== sym) return;
+
+    const quoteOk = qRes && qRes.status !== 'error' && qRes.close;
+
+    if (!quoteOk) {
+      if (body) body.innerHTML = `
+        <div class="empty-state" style="padding:60px 20px">
+          <i class="fa-solid fa-circle-exclamation" style="font-size:2.5rem;color:var(--red)"></i>
+          <p style="margin-top:16px">No data found for <strong>${sym}</strong>${isIndia ? ' on NSE' : ''}.<br>
+          <span style="font-size:0.85rem;color:var(--text3)">Check the symbol spelling and make sure the correct market (US / India) is selected in Top Picks.</span></p>
+          <button class="btn-outline" style="margin-top:20px" onclick="switchSection('picks')">
+            <i class="fa-solid fa-arrow-left"></i> Back to Picks
+          </button>
+        </div>`;
+      return;
+    }
+
+    // Build stock object from API data
+    let s = {
+      symbol: sym,
+      name: qRes.name || sym,
+      sector: 'Unknown',
+      price: 0, chgPct: 0, chg: 0,
+      pe: 0, beta: 1, mcap: 0, div: 0,
+      w52l: 0, w52h: 0, vol: 0, avgVol: 0,
+    };
+    s = mapTwelveQuote(qRes, s);
+    s.name = qRes.name || sym;
+
+    if (stRes && stRes.status !== 'error' && stRes.statistics) {
+      s = mapTwelveStats(stRes, s);
+    }
+
+    s.score = scoreStock(s, isIndia);
+
+    await openPickReport(sym, isIndia, s);
+
+  } catch (e) {
+    if ($('pickReportBody') && state.pickReportStock?.symbol === sym) {
+      $('pickReportBody').innerHTML = `
+        <div class="empty-state" style="padding:60px 20px">
+          <i class="fa-solid fa-circle-exclamation" style="font-size:2.5rem;color:var(--red)"></i>
+          <p style="margin-top:16px">Failed to load data for <strong>${sym}</strong>: ${e.message}</p>
+        </div>`;
+    }
+  }
+}
+
+async function openPickReport(symbol, isIndia, prebuilt = null) {
+  let s = prebuilt;
+  if (!s) {
+    const data = isIndia ? picksState.india : picksState.us;
+    s = data?.find(x => x.symbol === symbol);
+    if (!s) { toast('Pick data unavailable', 'error'); return; }
+  }
 
   state.pickReportReturn = 'picks';
   state.pickReportStock  = { symbol, isIndia };
