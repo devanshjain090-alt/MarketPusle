@@ -1359,7 +1359,8 @@ function debounce(fn, delay) {
 // Close dropdowns when clicking outside
 document.addEventListener('click', e => {
   [['usSearchInput','usSearchDrop'],['indiaSearchInput','indiaSearchDrop'],
-   ['watchSymbolInput','watchSearchDrop'],['fSymbol','portSearchDrop']
+   ['watchSymbolInput','watchSearchDrop'],['fSymbol','portSearchDrop'],
+   ['picksSearchInput','picksSearchDrop']
   ].forEach(([inId, dropId]) => {
     const inp = $(inId), drop = $(dropId);
     if (drop && drop.classList.contains('open') &&
@@ -1501,6 +1502,38 @@ if (portIn && portDrop) {
       if (!portIn.contains(e.target) && !portDrop.contains(e.target)) closeDrop('portSearchDrop');
     });
   }
+}
+
+// ── Picks Search Bar ──────────────────────────────────────────────────
+const picksIn = $('picksSearchInput'), picksDrop = $('picksSearchDrop');
+if (picksIn && picksDrop) {
+  const doPicksSearch = debounce(async query => {
+    if (!query) { closeDrop('picksSearchDrop'); return; }
+    const isIndia = picksState.market === 'india';
+    const hits = isIndia ? await searchIndia(query) : await searchUS(query);
+    if (!hits.length || picksIn.value.trim().toUpperCase() !== query.toUpperCase()) return;
+    picksDrop.innerHTML = dropHtml(hits);
+    picksDrop.className = 'search-dropdown open';
+    picksDrop.querySelectorAll('.search-item').forEach(el =>
+      el.addEventListener('click', () => {
+        picksIn.value = el.dataset.symbol;
+        closeDrop('picksSearchDrop');
+        searchStockReport(el.dataset.symbol);
+      })
+    );
+  }, 350);
+  picksIn.addEventListener('input', () => doPicksSearch(picksIn.value.trim()));
+  picksIn.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeDrop('picksSearchDrop'); return; }
+    if (e.key === 'Enter') { picksSearchSubmit(); }
+  });
+}
+
+function picksSearchSubmit() {
+  const sym = (picksIn?.value || '').trim();
+  if (!sym) return;
+  closeDrop('picksSearchDrop');
+  searchStockReport(sym);
 }
 
 // ── Select callbacks ───────────────────────────────────────────────────

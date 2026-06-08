@@ -689,16 +689,15 @@
     </div>
 
     <!-- Stock search bar -->
-    <div class="picks-search-wrap">
-      <div class="picks-search-bar">
-        <i class="fa-solid fa-magnifying-glass picks-search-icon"></i>
-        <input type="text" id="picksSearchInput" class="picks-search-input"
-          placeholder="Search any stock — e.g. NVDA, RELIANCE, TSLA…"
-          onkeydown="if(event.key==='Enter')searchStockReport(this.value)">
-        <button class="picks-search-btn" onclick="searchStockReport($('picksSearchInput').value)">
-          Get Report
-        </button>
+    <div class="term-search-bar" style="margin-bottom:16px">
+      <div class="term-search-wrap">
+        <input type="text" id="picksSearchInput" class="term-input" autocomplete="off"
+          placeholder="Search any stock — NVDA, RELIANCE, TSLA…" style="width:320px">
+        <div class="search-dropdown" id="picksSearchDrop"></div>
       </div>
+      <button class="btn-analyze" onclick="picksSearchSubmit()">
+        <i class="fa-solid fa-file-lines"></i> Get Report
+      </button>
     </div>
 
     <!-- Category filter row -->
