@@ -856,6 +856,102 @@ function updateTopPills() {
   pill('pillSensex', sx, true);
 }
 
+// TradingView symbols for each index key
+const INDEX_TV = {
+  sp500:  { sym: 'SP:SPX',        tz: 'America/New_York' },
+  nasdaq: { sym: 'NASDAQ:IXIC',   tz: 'America/New_York' },
+  dow:    { sym: 'DJ:DJI',        tz: 'America/New_York' },
+  nifty:  { sym: 'NSE:NIFTY50',   tz: 'Asia/Kolkata'     },
+  sensex: { sym: 'BSE:SENSEX',    tz: 'Asia/Kolkata'     },
+  bnifty: { sym: 'NSE:BANKNIFTY', tz: 'Asia/Kolkata'     },
+};
+
+// Yahoo Finance symbols mapped to indexState keys
+const INDEX_YAHOO_MAP = {
+  '^GSPC':  'sp500',
+  '^IXIC':  'nasdaq',
+  '^DJI':   'dow',
+  '^NSEI':  'nifty',
+  '^BSESN': 'sensex',
+  '^NSEBANK':'bnifty',
+};
+
+async function fetchIndexPrices() {
+  try {
+    const results = await fetchYahoo(Object.keys(INDEX_YAHOO_MAP));
+    if (!results.length) return;
+    results.forEach(q => {
+      const key = INDEX_YAHOO_MAP[q.symbol];
+      if (!key || !(q.regularMarketPrice > 0)) return;
+      indexState[key] = {
+        price:  q.regularMarketPrice,
+        chg:    q.regularMarketChange          ?? 0,
+        chgPct: q.regularMarketChangePercent   ?? 0,
+      };
+    });
+    updateTopPills();
+    updateIndexCards();
+  } catch {}
+}
+
+// Fetch live index prices immediately, then refresh every 5 minutes
+fetchIndexPrices();
+setInterval(fetchIndexPrices, 5 * 60 * 1000);
+
+// ── Index Chart Modal ─────────────────────────────────────────────────
+function openIndexChart(key) {
+  const m   = INDEX_MAP[key];
+  const tv  = INDEX_TV[key];
+  const s   = indexState[key];
+  if (!m || !tv) return;
+
+  const modal = $('indexChartModal');
+  const fmt   = m.isIndia ? _fmtIN1 : _fmtUS2;
+
+  $('idxChartName').textContent  = m.display;
+  $('idxChartPrice').textContent = s ? fmt.format(s.price) : '—';
+  const chgEl = $('idxChartChg');
+  if (s) {
+    chgEl.textContent  = `${chgSign(s.chg)}${s.chgPct.toFixed(2)}%`;
+    chgEl.className    = 'idx-chart-chg ' + chgClass(s.chg);
+  } else {
+    chgEl.textContent = '';
+  }
+
+  modal.classList.add('open');
+
+  const container = $('indexChartContainer');
+  container.innerHTML = '';
+  if (typeof TradingView !== 'undefined') {
+    try {
+      new TradingView.widget({
+        autosize: true,
+        symbol:   tv.sym,
+        interval: 'D',
+        timezone: tv.tz,
+        theme: 'dark', style: '1',
+        locale: 'en',
+        enable_publishing: false,
+        withdateranges: true,
+        hide_side_toolbar: false,
+        allow_symbol_change: false,
+        studies: ['RSI@tv-basicstudies','MACD@tv-basicstudies','Volume@tv-basicstudies'],
+        container_id: 'indexChartContainer',
+      });
+    } catch {
+      container.innerHTML = '<div style="padding:60px;text-align:center;color:var(--text3)">Chart unavailable</div>';
+    }
+  } else {
+    container.innerHTML = '<div style="padding:60px;text-align:center;color:var(--text3)">Loading chart…</div>';
+  }
+}
+
+function closeIndexChart() {
+  const modal = $('indexChartModal');
+  modal.classList.remove('open');
+  $('indexChartContainer').innerHTML = '';
+}
+
 updateIndexCards();
 setInterval(updateIndexCards, 10000);
 
@@ -2196,6 +2292,10 @@ function closeModal() {
   $('addModal').className = 'modal-overlay';
   closeDrop('portSearchDrop');
 }
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeIndexChart();
+});
 
 function updateInvestPreview() {
   const qty = parseFloat($('fQty').value) || 0;

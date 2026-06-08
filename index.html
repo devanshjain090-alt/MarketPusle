@@ -135,10 +135,10 @@
       <div class="search-dropdown" id="searchDropdown"></div>
     </div>
     <div class="topbar-pills">
-      <div class="index-pill" id="pillSP500"><span class="pill-name">S&P 500</span><span class="pill-val">—</span><span class="pill-chg">—</span></div>
-      <div class="index-pill" id="pillNasdaq"><span class="pill-name">NASDAQ</span><span class="pill-val">—</span><span class="pill-chg">—</span></div>
-      <div class="index-pill india" id="pillNifty"><span class="pill-name">NIFTY 50</span><span class="pill-val">—</span><span class="pill-chg">—</span></div>
-      <div class="index-pill india" id="pillSensex"><span class="pill-name">SENSEX</span><span class="pill-val">—</span><span class="pill-chg">—</span></div>
+      <div class="index-pill" id="pillSP500" onclick="openIndexChart('sp500')" title="S&P 500 — click to open chart"><span class="pill-name">S&P 500</span><span class="pill-val">—</span><span class="pill-chg">—</span></div>
+      <div class="index-pill" id="pillNasdaq" onclick="openIndexChart('nasdaq')" title="NASDAQ — click to open chart"><span class="pill-name">NASDAQ</span><span class="pill-val">—</span><span class="pill-chg">—</span></div>
+      <div class="index-pill india" id="pillNifty" onclick="openIndexChart('nifty')" title="NIFTY 50 — click to open chart"><span class="pill-name">NIFTY 50</span><span class="pill-val">—</span><span class="pill-chg">—</span></div>
+      <div class="index-pill india" id="pillSensex" onclick="openIndexChart('sensex')" title="SENSEX — click to open chart"><span class="pill-name">SENSEX</span><span class="pill-val">—</span><span class="pill-chg">—</span></div>
     </div>
     <button class="topbar-refresh" id="refreshBtn" title="Refresh Prices">
       <i class="fa-solid fa-rotate-right"></i>
@@ -1489,5 +1489,20 @@ document.addEventListener('mousemove', function(e) {
 })();
 </script>
 <script src="js/onboarding.js"></script>
+
+<!-- Index Chart Modal -->
+<div class="modal-overlay" id="indexChartModal" onclick="closeIndexChart()">
+  <div class="idx-chart-box" onclick="event.stopPropagation()">
+    <div class="idx-chart-header">
+      <div class="idx-chart-meta">
+        <span class="idx-chart-name" id="idxChartName">—</span>
+        <span class="idx-chart-price" id="idxChartPrice"></span>
+        <span class="idx-chart-chg" id="idxChartChg"></span>
+      </div>
+      <button class="idx-chart-close" onclick="closeIndexChart()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="indexChartContainer"></div>
+  </div>
+</div>
 </body>
 </html>

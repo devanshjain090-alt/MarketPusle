@@ -366,13 +366,26 @@ body.sidebar-rail .nav-item[data-label]:hover::after {
   border: 1px solid var(--border);
   border-radius: 2px;
   font-family: var(--mono);
-  font-size: 11px; cursor: default;
+  font-size: 11px; cursor: pointer;
   transition: var(--transition);
 }
+.index-pill:hover { border-color: var(--gold); background: var(--bg2); }
 .index-pill.india { border-color: rgba(196,132,90,0.2); }
+.index-pill.india:hover { border-color: var(--india); }
 .pill-name { color: var(--text3); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; }
 .pill-val  { font-family: var(--mono); font-size: 11px; }
 .pill-chg  { font-family: var(--mono); font-size: 10px; }
+
+/* ── Index Chart Modal ─────────────────────────────────────────────── */
+.idx-chart-box { display: flex; flex-direction: column; width: min(95vw, 940px); height: min(88vh, 620px); background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-xs); overflow: hidden; animation: modalIn 0.2s ease; }
+.idx-chart-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; background: var(--bg3); }
+.idx-chart-meta { display: flex; align-items: baseline; gap: 10px; }
+.idx-chart-name { font-weight: 700; font-size: 15px; font-family: var(--mono); color: var(--text); }
+.idx-chart-price { font-size: 14px; font-family: var(--mono); color: var(--text); }
+.idx-chart-chg { font-size: 12px; font-family: var(--mono); }
+.idx-chart-close { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 17px; padding: 4px 8px; line-height: 1; transition: color 0.15s; }
+.idx-chart-close:hover { color: var(--text); }
+#indexChartContainer { flex: 1; min-height: 0; }
 
 .topbar-refresh {
   width: 32px; height: 32px;
