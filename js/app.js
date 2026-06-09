@@ -823,7 +823,6 @@ function updateIndexCards() {
   Object.keys(INDEX_MAP).forEach(k => {
     const m = INDEX_MAP[k];
     const s = indexState[k];
-    s.price = simulatePrice(s.price, 0.0005);
 
     const priceEl = $(`${k}price`);
     const chgEl = $(`${k}chg`);
@@ -866,66 +865,44 @@ const INDEX_TV = {
   bnifty: { sym: 'NSE:BANKNIFTY', tz: 'Asia/Kolkata'     },
 };
 
-// ── Index price fetch ─────────────────────────────────────────────────
-// US: Alpha Vantage GLOBAL_QUOTE (CORS-safe, no proxy needed)
-// India: Yahoo Finance with proxy fallback
-async function fetchIndexPrices() {
-  const n = v => { const f = parseFloat(v); return isNaN(f) ? 0 : f; };
-
-  // ── US indexes via Alpha Vantage ──────────────────────────────────
-  const usIndex = { sp500: '^GSPC', nasdaq: '^IXIC', dow: '^DJI' };
-  await Promise.all(Object.entries(usIndex).map(async ([key, sym]) => {
-    try {
-      const url = `${AV_BASE}?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(sym)}&apikey=${AV_KEY}`;
-      const r   = await fetch(url);
-      if (!r.ok) return;
-      const data = await r.json();
-      const q    = data?.['Global Quote'];
-      if (!q?.['05. price']) return;
-      const price  = n(q['05. price']);
-      const chg    = n(q['09. change']);
-      const chgPct = n((q['10. change percent'] || '0').replace('%', ''));
-      if (price > 0) indexState[key] = { price, chg, chgPct };
-    } catch {}
-  }));
-
-  // ── India indexes via Yahoo Finance + proxy fallback ──────────────
-  const inSyms   = ['^NSEI', '^BSESN', '^NSEBANK'];
-  const inKeyMap = { '^NSEI': 'nifty', '^BSESN': 'sensex', '^NSEBANK': 'bnifty' };
-  const fields   = 'regularMarketPrice,regularMarketChange,regularMarketChangePercent';
-  const base     = `https://query2.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(inSyms.join(','))}&fields=${fields}`;
-  const proxyUrls = [
-    base,
-    base.replace('query2', 'query1'),
-    `https://corsproxy.io/?${encodeURIComponent(base)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(base)}`,
-  ];
-  for (const url of proxyUrls) {
-    try {
-      const r = await fetch(url, { headers: { Accept: 'application/json' } });
-      if (!r.ok) continue;
-      const data    = await r.json();
-      const results = data?.quoteResponse?.result || [];
-      if (!results.length) continue;
-      results.forEach(q => {
-        const key = inKeyMap[q.symbol];
-        if (!key || !(q.regularMarketPrice > 0)) return;
+// ── Real index fetch via Yahoo v8 chart (same proxy chain as India stocks) ──
+async function fetchIndexQuotes() {
+  await Promise.all(Object.entries(INDEX_MAP).map(async ([key, m]) => {
+    const ySym   = encodeURIComponent(m.sym);
+    const target = `https://query1.finance.yahoo.com/v8/finance/chart/${ySym}?interval=1d&range=5d`;
+    const proxies = [
+      `https://corsproxy.io/?${target}`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
+    ];
+    for (const url of proxies) {
+      try {
+        const ctrl  = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 8000);
+        const r     = await fetch(url, { signal: ctrl.signal });
+        clearTimeout(timer);
+        if (!r.ok) continue;
+        const data  = await r.json();
+        const meta  = data?.chart?.result?.[0]?.meta;
+        const price = meta?.regularMarketPrice;
+        if (!(price > 0)) continue;
+        const prev = meta.previousClose || meta.chartPreviousClose || price;
         indexState[key] = {
-          price:  q.regularMarketPrice,
-          chg:    q.regularMarketChange        ?? 0,
-          chgPct: q.regularMarketChangePercent ?? 0,
+          price,
+          chg:    price - prev,
+          chgPct: prev > 0 ? ((price - prev) / prev) * 100 : 0,
+          real:   true,
         };
-      });
-      break;
-    } catch {}
-  }
-
+        break;
+      } catch {}
+    }
+  }));
   updateTopPills();
   updateIndexCards();
 }
 
-fetchIndexPrices();
-setInterval(fetchIndexPrices, 5 * 60 * 1000);
+updateIndexCards();             // initial paint with baseline while fetch is in flight
+fetchIndexQuotes();             // fetch real values once on load
+setInterval(fetchIndexQuotes, 120000); // refresh every 2 min (real calls, not simulation)
 
 // ── Index Chart Modal ─────────────────────────────────────────────────
 let _idxChartSeq = 0; // ensures a unique container ID every open — avoids TradingView reuse bugs
@@ -987,8 +964,6 @@ function closeIndexChart() {
   $('indexChartContainer').innerHTML = '';
 }
 
-updateIndexCards();
-setInterval(updateIndexCards, 10000);
 
 // =====================================================================
 // MOVERS
@@ -3861,7 +3836,7 @@ async function runRoast() {
 $('refreshBtn') && $('refreshBtn').addEventListener('click', () => {
   $('refreshBtn').style.transform = 'rotate(360deg)';
   setTimeout(() => { $('refreshBtn').style.transform=''; }, 500);
-  updateIndexCards();
+  fetchIndexQuotes();
   if (state.section==='portfolio') renderPortfolio();
   if (state.section==='watchlist') renderWatchlist();
   toast('Prices refreshed');
