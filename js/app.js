@@ -5622,27 +5622,36 @@ const INDIA_SECTOR_MAP = {
 function resolveIndiaSector(symbol, name) {
   const s = (symbol || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (INDIA_SECTOR_MAP[s]) return INDIA_SECTOR_MAP[s];
+
+  // Search both symbol and full company name so mangled importer symbols still classify correctly
   const t = `${s} ${(name || '').toUpperCase()}`;
+
+  // ETFs / Funds — check first to avoid misclassifying "NIFTY ETF" as Energy etc.
+  if (/\bETF\b|BEES\b|IETF|MUTUAL|FUND|INDEX FUND|GOLDBEES|SILVER|GOLD ETF|NIFTY|SENSEX|LIQUIDBEES/.test(t)) return 'ETF/Fund';
+
+  if (/JEWELL?ER|GEMS|DIAMOND|GOLD ORNAMENT/.test(t))                     return 'Consumer';
+  if (/PHOSPHAT|FERTILIZ|FERTILISER|NITROGEN|UREA|AGRO|PESTICIDE|SEED|CROP/.test(t)) return 'Agri';
   if (/BANK|BANCORP|BANQUE/.test(t))                                      return 'Finance';
-  if (/FINANCE|CAPITAL|FINSERV|CREDIT|LENDING|LEASING|INVEST|FINCORP/.test(t)) return 'Finance';
-  if (/INSURANCE|LIFE INS|GENERAL INS/.test(t))                           return 'Finance';
-  if (/PHARMA|LABORATORIES|LABS|DRUG|BIOCON|BIOLOGICS/.test(t))           return 'Pharma';
-  if (/HOSPITAL|HEALTHCARE|MEDIC|CLINIC|DIAGNOST|PATHOLOG/.test(t))       return 'Healthcare';
-  if (/INFOTECH|SOFTWARE|DIGITAL|SYSTEMS|TECHNOLOGY|COMPUTERS|SOLUTION/.test(t)) return 'Technology';
-  if (/MOTOR|AUTOMOBILE|AUTO|TYRE|VEHICLE|WHEEL/.test(t))                 return 'Auto';
-  if (/STEEL|METAL|ALUMIN|COPPER|ZINC|IRON|FERRO|ALLOY/.test(t))          return 'Metal';
-  if (/CEMENT|CONCR/.test(t))                                             return 'Cement';
-  if (/OIL|GAS|PETROL|REFIN|PETROLEUM|POWER|ELECTRIC|ENERGY|SOLAR|WIND|HYDRO|THERMAL|COAL/.test(t)) return 'Energy';
-  if (/TELECOM|COMMUNICATION|WIRELESS|CELLULAR/.test(t))                  return 'Telecom';
-  if (/REAL ESTATE|REALTY|HOUSING|PROPERTIES|DEVELOPER/.test(t))          return 'Real Estate';
-  if (/PAINT|CHEMICAL|POLYMER|RESIN|COATING/.test(t))                     return 'Chemical';
-  if (/FMCG|FOODS|BEVERAGE|DAIRY|CONSUMER GOOD/.test(t))                  return 'FMCG';
-  if (/RETAIL|MART|FASHION|APPAREL|CLOTH/.test(t))                        return 'Retail';
-  if (/TEXTILE|FIBER|YARN|FABRIC|SPINNING/.test(t))                       return 'Textile';
-  if (/AGRI|FERTILIZ|PESTICIDE|SEED|FARM|CROP/.test(t))                   return 'Agri';
-  if (/LOGISTIC|TRANSPORT|FREIGHT|COURIER|CARGO|SHIPPING/.test(t))        return 'Logistics';
-  if (/DEFENCE|DEFENSE|AEROSPACE|AVIATION|AIRLINE/.test(t))               return 'Defence';
-  if (/INFRA|ENGINEER|CONSTRUCT|PROJECT|EPC/.test(t))                     return 'Infrastructure';
+  if (/PRUDENTIAL|AMC|ASSET MANAG|FINSERV|CREDIT|LENDING|LEASING|INVEST|FINCORP|NBFC|HOUSING FIN|CAPITAL|FINANC/.test(t)) return 'Finance';
+  if (/INSURANCE|LIFE INS|GENERAL INS|ASSURANCE/.test(t))                 return 'Finance';
+  if (/PHARMA|LABORATOR|LABS|DRUG|BIOCON|BIOLOGIC|CIPLA|REMEDIES|HEALERS/.test(t)) return 'Pharma';
+  if (/HOSPITAL|HEALTHCARE|MEDIC|CLINIC|DIAGNOST|PATHOLOG|WELLNESS/.test(t)) return 'Healthcare';
+  if (/INFOTECH|SOFTWARE|DIGITAL|SYSTEMS|TECHNOLOG|COMPUTER|SOLUTION|MINDTREE|CONSULTANC|DATA|CYBER/.test(t)) return 'Technology';
+  if (/MOTOR|AUTOMOBILE|\bAUTO\b|TYRE|VEHICLE|WHEEL|MOBILITY|SCOOTER/.test(t)) return 'Auto';
+  if (/STEEL|METAL|ALUMIN|COPPER|ZINC|IRON|FERRO|ALLOY|MINING|MINERAL/.test(t)) return 'Metal';
+  if (/CEMENT|CONCRETE|RMC/.test(t))                                      return 'Cement';
+  if (/PETROL|REFIN|PETROLEUM|\bOIL\b|\bGAS\b|POWER|ELECTRIC|ENERG|SOLAR|WIND|HYDRO|THERMAL|COAL|RENEWABLE/.test(t)) return 'Energy';
+  if (/TELECOM|COMMUNICATION|WIRELESS|CELLULAR|AIRTEL|VODAFONE|\bJIO\b/.test(t)) return 'Telecom';
+  if (/REAL ESTATE|REALTY|HOUSING|PROPERT|DEVELOPER|INFRAREALTY|ESTATES/.test(t)) return 'Real Estate';
+  if (/PAINT|CHEMICAL|POLYMER|RESIN|COATING|SPECIALITY CHEM|DYES/.test(t)) return 'Chemical';
+  if (/FMCG|FOODS|BEVERAGE|DAIRY|CONSUMER GOOD|NESTLE|UNILEVER|BRITANNIA|SUGAR|TEA|COFFEE/.test(t)) return 'FMCG';
+  if (/RETAIL|MART|FASHION|APPAREL|CLOTH|LIFESTYLE|TRENT/.test(t))        return 'Retail';
+  if (/TEXTILE|FIBER|FIBRE|YARN|FABRIC|SPINNING|COTTON|GARMENT/.test(t))  return 'Textile';
+  if (/LOGISTIC|TRANSPORT|FREIGHT|COURIER|CARGO|SHIPPING|PORT/.test(t))   return 'Logistics';
+  if (/DEFENCE|DEFENSE|AEROSPACE|AVIATION|AIRLINE|SHIPBUILD/.test(t))     return 'Defence';
+  if (/INFRA|ENGINEER|CONSTRUCT|PROJECT|\bEPC\b|BUILDER|ROADS|HIGHWAY/.test(t)) return 'Infrastructure';
+  if (/CONGLOMERATE|ENTERPRISES|INDUSTRIES|DIVERSIFIED/.test(t))          return 'Conglomerate';
+
   return 'Other';
 }
 
