@@ -121,3 +121,47 @@ input:focus-visible,
     scroll-behavior: auto !important;
   }
 }
+
+/* =====================================================================
+   INTRO LOADER — 3D prism reveal on first dashboard entry of a session.
+   Mirrors the loader on login.html. Sits on top (z-index:10) and fades
+   away to reveal the dashboard. Palette scoped to the loader elements so
+   the loader's near-black --ink doesn't clash with the app's variables.
+   ===================================================================== */
+#loader, #scene, .mark {
+  --gold:        #c9a24b;
+  --gold-bright: #e8cd84;
+  --ink:         #040405;
+  --text:        #f2efe9;
+  --l-text3:     #7d7a72;
+}
+#loader { position: fixed; inset: 0; z-index: 10; background: var(--ink); }
+#loader.done { animation: loaderOut 1.2s cubic-bezier(.4,0,.2,1) forwards; pointer-events: none; }
+@keyframes loaderOut { to { opacity: 0; visibility: hidden; } }
+#scene { position: fixed; inset: 0; z-index: 11; }
+
+.mark {
+  position: fixed; left: 0; right: 0; top: 50%; z-index: 12;
+  text-align: center; transform: translateY(-50%);
+  pointer-events: none; opacity: 0;
+}
+.mark.show     { animation: markUp 1.2s cubic-bezier(.2,.8,.2,1) forwards; }
+.mark.collapse { animation: markCollapse .9s cubic-bezier(.6,0,.4,1) forwards; }
+@keyframes markUp       { from { opacity: 0; letter-spacing: .5em; } to { opacity: 1; letter-spacing: .24em; } }
+@keyframes markCollapse { to   { opacity: 0; transform: translateY(-50%) scale(.82); filter: blur(3px); } }
+.mark h1 {
+  font-family: var(--serif);
+  font-size: clamp(40px, 8vw, 76px); font-weight: 600;
+  background: linear-gradient(110deg, #fff 10%, var(--gold-bright) 50%, var(--gold) 72%, #fff 96%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  text-indent: .24em; letter-spacing: .24em;
+}
+.mark p {
+  font-family: var(--mono);
+  font-size: clamp(9px, 1.3vw, 12px); letter-spacing: .6em;
+  text-transform: uppercase; color: var(--l-text3);
+  margin-top: 14px; text-indent: .6em;
+}
+
+/* Reduced-motion users skip the intro entirely */
+@media (prefers-reduced-motion: reduce) { #loader { display: none; } }

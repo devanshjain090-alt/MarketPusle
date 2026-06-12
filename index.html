@@ -6,7 +6,7 @@
   <title>Prism — Portfolio & Market Terminal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <link rel="stylesheet" href="css/style.css">
@@ -21,6 +21,12 @@
   } catch(e) { window.location.replace('login.html'); }
 })();
 </script>
+
+<!-- ===== INTRO LOADER (3D prism reveal) — plays once per session, then reveals the dashboard ===== -->
+<div id="loader">
+  <canvas id="scene"></canvas>
+  <div class="mark" id="mark"><h1>PRISM</h1><p>Professional Terminal</p></div>
+</div>
 
 <canvas id="bgCanvas"></canvas>
 <div class="grain"></div>
@@ -1505,5 +1511,120 @@ document.addEventListener('mousemove', function(e) {
     <div id="indexChartContainer"></div>
   </div>
 </div>
+
+<!-- ===== INTRO LOADER ANIMATION (Three.js prism) — once per session ===== -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* Plays the prism intro the first time the dashboard is entered in a
+   browser session (sessionStorage flag), then fades to reveal the app.
+   Subsequent refreshes within the session skip straight to the dashboard.
+   Wrapped in an IIFE; any failure reveals the dashboard rather than
+   trapping the user behind the loader. */
+(function(){
+  const SEEN = 'mp_intro_seen';
+  const loaderEl = document.getElementById('loader');
+  function hideLoader(){ if (loaderEl) loaderEl.style.display = 'none'; }
+
+  // Reduced motion: CSS already hides #loader — nothing to run.
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  // Already played this session (e.g. seen on the login page) → straight in.
+  if (sessionStorage.getItem(SEEN)) { hideLoader(); return; }
+  // CDN failed to load → don't trap the user.
+  if (typeof THREE === 'undefined') { hideLoader(); return; }
+
+  try {
+    sessionStorage.setItem(SEEN, '1');
+
+    const ATIME=5400;
+    const canvas=document.getElementById('scene');
+    const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+    renderer.setSize(innerWidth,innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+    const scene=new THREE.Scene();
+    const camera=new THREE.PerspectiveCamera(48,innerWidth/innerHeight,0.1,100);
+    camera.position.set(0,0,9);
+    const GOLD=0xc9a24b, GOLD_B=0xe8cd84;
+
+    // black glass prism, gold edges
+    const tri=new THREE.Shape(); tri.moveTo(0,1.3); tri.lineTo(-1.1,-0.85); tri.lineTo(1.1,-0.85); tri.lineTo(0,1.3);
+    const pg=new THREE.ExtrudeGeometry(tri,{depth:0.5,bevelEnabled:true,bevelThickness:0.06,bevelSize:0.05,bevelSegments:2});
+    pg.center();
+    const prism=new THREE.Mesh(pg,new THREE.MeshPhysicalMaterial({
+      color:0x070708,metalness:0.4,roughness:0.12,transmission:0.5,thickness:1.3,ior:1.6,
+      transparent:true,opacity:0.94,clearcoat:1,clearcoatRoughness:0.06,reflectivity:0.85,side:THREE.DoubleSide
+    }));
+    prism.scale.setScalar(0.001); scene.add(prism);
+    const edges=new THREE.LineSegments(new THREE.EdgesGeometry(pg),
+      new THREE.LineBasicMaterial({color:GOLD_B,transparent:true,opacity:0}));
+    prism.add(edges);
+
+    // gold beam in
+    const beam=new THREE.Mesh(new THREE.PlaneGeometry(6,0.028),
+      new THREE.MeshBasicMaterial({color:GOLD_B,transparent:true,opacity:0}));
+    beam.position.set(-4.2,0,0.25); scene.add(beam);
+
+    // ONE sharp gold chart line, fires out the right
+    const pts=[]; let y=-0.2;
+    for(let i=0;i<=34;i++){ const x=i*0.16; y+=(Math.random()-0.4)*0.22; y=Math.max(-0.9,Math.min(1.2,y)); pts.push(new THREE.Vector3(x, y*0.42+(i/34)*0.85-0.25, 0)); }
+    const chartGeo=new THREE.BufferGeometry().setFromPoints(pts);
+    const chartMat=new THREE.LineBasicMaterial({color:GOLD_B,transparent:true,opacity:0});
+    const chart=new THREE.Line(chartGeo,chartMat);
+    chart.position.set(0.9,0,0.05); chart.scale.x=0.001; scene.add(chart);
+
+    // minimal lighting
+    scene.add(new THREE.AmbientLight(0x2a2415,0.7));
+    const k=new THREE.PointLight(0xfff0cf,1.1); k.position.set(-3,2,4); scene.add(k);
+    const g=new THREE.PointLight(GOLD,1.3); g.position.set(2.2,-0.5,3); scene.add(g);
+
+    const startT=performance.now();
+    const clamp=v=>Math.max(0,Math.min(1,v));
+    const easeOut=t=>1-Math.pow(1-t,3);
+    const easeInOut=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+    const easeIn=t=>t*t*t;
+    let markShown=false,collapsing=false,finished=false;
+
+    function finish(){ if(!finished){ finished=true; if(loaderEl) loaderEl.classList.add('done'); } }
+
+    function frame(now){
+      const t=now-startT;
+
+      const beamIn   = clamp(t/350);
+      const impact   = easeInOut(clamp((t-300)/750));
+      const fire     = easeOut(clamp((t-1350)/700));
+      const collapseT= easeIn(clamp((t-3600)/1300));
+
+      beam.material.opacity = beamIn * (t<2000?1:clamp(1-(t-2000)/350));
+
+      const ps = (0.001 + impact*1.0) * (1 - collapseT*0.95);
+      prism.scale.setScalar(ps);
+      edges.material.opacity = impact * (1 - collapseT);
+      prism.rotation.y = -0.4 + t*0.00012;
+      prism.material.opacity = 0.94*(1-collapseT);
+
+      const chartLen = (0.001 + fire*1.0) * (1 - collapseT);
+      chart.scale.x = chartLen;
+      chartMat.opacity = clamp((t-1350)/250) * (1 - collapseT*1.1);
+      chart.position.x = 0.9 - collapseT*0.9;
+
+      const markEl=document.getElementById('mark');
+      if(t>2200 && !markShown){ markEl.classList.add('show'); markShown=true; }
+      if(collapseT>0 && !collapsing){ markEl.classList.add('collapse'); collapsing=true; }
+
+      camera.position.z = 9 - easeOut(clamp((t-900)/2800))*1.3 - collapseT*0.8;
+
+      renderer.render(scene,camera);
+      if(t<ATIME) requestAnimationFrame(frame);
+      else finish();
+    }
+    requestAnimationFrame(frame);
+
+    // Safety net: force-reveal even if the rAF loop is throttled/stalled.
+    setTimeout(finish, ATIME + 1500);
+
+    addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();});
+  } catch(e){
+    hideLoader();
+  }
+})();
+</script>
 </body>
 </html>

@@ -719,15 +719,19 @@ window.addEventListener('load', function() {
    with the page's existing globals. Any failure reveals the form instead
    of leaving it covered. */
 (function(){
+  const SEEN = 'mp_intro_seen';
   const loaderEl = document.getElementById('loader');
   function hideLoader(){ if (loaderEl) loaderEl.style.display = 'none'; }
 
   // Reduced-motion users: CSS already hides #loader, so skip WebGL entirely.
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  // Already played this session → don't replay (and the dashboard will skip it too).
+  if (sessionStorage.getItem(SEEN)) { hideLoader(); return; }
   // If the CDN didn't load, don't trap the user behind the loader.
   if (typeof THREE === 'undefined') { hideLoader(); return; }
 
   try {
+    sessionStorage.setItem(SEEN, '1');
     const ATIME=5400;
     const canvas=document.getElementById('scene');
     const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
