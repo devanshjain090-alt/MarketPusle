@@ -135,13 +135,13 @@ input:focus-visible,
   --text:        #f2efe9;
   --l-text3:     #7d7a72;
 }
-#loader { position: fixed; inset: 0; z-index: 10; background: var(--ink); }
+#loader { position: fixed; inset: 0; z-index: 99999; background: var(--ink); }
 #loader.done { animation: loaderOut 1.2s cubic-bezier(.4,0,.2,1) forwards; pointer-events: none; }
 @keyframes loaderOut { to { opacity: 0; visibility: hidden; } }
-#scene { position: fixed; inset: 0; z-index: 11; }
+#scene { position: fixed; inset: 0; z-index: 100000; }
 
 .mark {
-  position: fixed; left: 0; right: 0; top: 50%; z-index: 12;
+  position: fixed; left: 0; right: 0; top: 50%; z-index: 100001;
   text-align: center; transform: translateY(-50%);
   pointer-events: none; opacity: 0;
 }
