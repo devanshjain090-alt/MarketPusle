@@ -4438,13 +4438,6 @@ const METRIC_INFO = {
       return `At ${b.toFixed(2)}, this is extremely volatile — suitable only for high-conviction, short-duration trades with tight risk management.`;
     }
   },
-  alpha: {
-    label: 'Alpha (Risk-Adjusted Outperformance)',
-    what: 'Alpha is the return a stock or portfolio delivered ABOVE (or below) what its level of risk (Beta) would predict. If a stock has a Beta of 1.2 and the market returned 10%, the "expected" return for that stock is 12%. If it actually returned 15%, the Alpha is +3%. Positive alpha means the stock beat its risk-adjusted benchmark — it "added value" beyond what the risk implied.',
-    ideal: 'Any positive Alpha is desirable — it means outperformance after accounting for the risk taken. Consistently positive alpha over multiple years is the hallmark of a high-quality business or skilled fund manager. Zero alpha means the stock delivered exactly what its risk profile implied.',
-    caveat: 'Computing Alpha requires a multi-year history of returns regressed against a benchmark index. This terminal does not currently pull historical price series data, so a live Alpha figure cannot be calculated without introducing misleading results. It is listed here for education.',
-    interpret: () => 'Alpha is not calculated in this terminal — it requires a full historical return series regressed against a benchmark (Nifty 50 / S&P 500). Computing it from incomplete data would be misleading. Use a dedicated research platform (e.g. Screener.in for India, Macrotrends for US) for historical Alpha data.'
-  },
   mcap: {
     label: 'Market Capitalisation (Company Size)',
     what: 'The total market value of all outstanding shares: Share Price × Total Shares Outstanding. It represents the market\'s current assessment of the entire company\'s worth. Categories in India: Mega Cap >₹10T, Large Cap ₹3–10T, Mid Cap ₹1–3T, Small Cap <₹1T. In the US: Mega Cap >$500B, Large Cap $100–500B, Mid Cap $20–100B, Small Cap <$20B.',
@@ -4783,7 +4776,6 @@ async function openPickReport(symbol, isIndia, prebuilt = null) {
   const baseMetrics =
     _metricRow('pe',      s.pe ? s.pe.toFixed(1) : '—',             s, isIndia) +
     _metricRow('beta',    s.beta ? s.beta.toFixed(2) : '—',          s, isIndia) +
-    _metricRow('alpha',   '<span class="rpt-na">N/A — see explanation</span>', s, isIndia) +
     _metricRow('mcap',    fmtMcap(s.mcap, isIndia),                  s, isIndia) +
     _metricRow('div',     s.div ? s.div.toFixed(2)+'%' : 'Nil',      s, isIndia) +
     _metricRow('range52', `${fmt2(s.w52l)} – ${fmt2(s.w52h)}`,       s, isIndia) +
