@@ -1386,6 +1386,11 @@
         </div>
       </div>
 
+      <div class="xray-alert warn" style="margin-bottom:16px">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span>For a clean import, remove all personal information (name, PAN, account/client ID, email, phone) from the file first — keep only the holdings columns (Symbol, Qty, Buy Price, Date). Extra personal data can cause rows to be misread or skipped.</span>
+      </div>
+
       <div class="import-dropzone" id="importDropzone"
            onclick="$('importFileInput').click()"
            ondragover="event.preventDefault();this.classList.add('dragover')"

@@ -4761,16 +4761,9 @@ async function openPickReport(symbol, isIndia, prebuilt = null) {
     </div>`;
   };
 
-  const newsHtml = news.length ? news.map(n => {
-    const srcUrl = (n.url && n.url.startsWith('http')) ? n.url : (NEWS_SOURCE_URLS[n.source] || '#');
-    return `<div class="rpt-news">
-      <span class="news-severity-dot ${n.severity||'medium'}"></span>
-      <div>
-        <a href="${srcUrl}" target="_blank" rel="noopener noreferrer">${n.headline}</a>
-        <span class="rpt-news-src">${n.source||'Market Wire'} · ${timeAgo(n.ts)}</span>
-      </div>
-    </div>`;
-  }).join('') : `<p class="rpt-muted">No recent news tagged for ${symbol}. Check the market news feed for macro updates.</p>`;
+  const newsHtml = news.length
+    ? news.map(_rptNewsItemHtml).join('')
+    : `<p class="rpt-muted"><i class="fa-solid fa-circle-notch fa-spin"></i> Fetching latest headlines for ${symbol}…</p>`;
 
   // Metric rows available immediately (no API call needed)
   const baseMetrics =
@@ -4814,7 +4807,8 @@ async function openPickReport(symbol, isIndia, prebuilt = null) {
 
     <div class="rpt-section">
       <h3><i class="fa-solid fa-bolt"></i> Recent News</h3>
-      ${newsHtml}
+      <div id="rptNewsBox" data-sym="${symbol}">${newsHtml}</div>
+      <div class="rpt-live-note" id="rptNewsLoading"><i class="fa-solid fa-circle-notch fa-spin"></i> Pulling the latest live headlines for ${symbol}…</div>
     </div>
 
     <div class="rpt-disclaimer">
@@ -4825,6 +4819,9 @@ async function openPickReport(symbol, isIndia, prebuilt = null) {
       <i class="fa-solid fa-chart-line"></i> Open Chart in Terminal
     </button>
   `;
+
+  // Async per-stock live news — fetch current headlines for THIS company
+  loadStockReportNews(symbol, s.name, isIndia);
 
   // Async live stats enrichment (US only — Twelve Data statistics endpoint)
   if (!isIndia) {
@@ -4856,6 +4853,59 @@ async function openPickReport(symbol, isIndia, prebuilt = null) {
     const note = $('rptLiveNote');
     if (note) note.remove();
   }
+}
+
+// Render one news row in the stock report's "Recent News" list.
+function _rptNewsItemHtml(n) {
+  // Live items carry a real article link; curated fallbacks don't, so send
+  // those to a headline search (the actual story) rather than a homepage.
+  const srcUrl = (n.url && n.url.startsWith('http'))
+    ? n.url
+    : `https://news.google.com/search?q=${encodeURIComponent(n.headline)}`;
+  return `<div class="rpt-news">
+    <span class="news-severity-dot ${n.severity||'medium'}"></span>
+    <div>
+      <a href="${srcUrl}" target="_blank" rel="noopener noreferrer">${n.headline}</a>
+      <span class="rpt-news-src">${n.source||'Market Wire'} · ${timeAgo(n.ts)}</span>
+    </div>
+  </div>`;
+}
+
+// Fetch current, company-specific headlines for the open stock report via a
+// Google News RSS search, then replace the report's news box with them.
+async function loadStockReportNews(symbol, name, isIndia) {
+  const box = $('rptNewsBox');
+  if (!box || box.dataset.sym !== symbol) return;
+  const clearLoading = () => { const n = $('rptNewsLoading'); if (n) n.remove(); };
+
+  // Search for the specific company. Quote the name for precision and add a
+  // market hint so we get finance stories rather than unrelated namesakes.
+  const query = encodeURIComponent(`"${name}" ${isIndia ? 'NSE share price' : 'stock'}`);
+  const region = isIndia ? 'hl=en-IN&gl=IN&ceid=IN:en' : 'hl=en-US&gl=US&ceid=US:en';
+  const feed = {
+    url: `https://news.google.com/rss/search?q=${query}&${region}`,
+    market: isIndia ? 'india' : 'us',
+    source: 'Google News',
+  };
+
+  let items = [];
+  try { items = await _fetchOneFeed(feed); } catch {}
+
+  // User may have navigated to another stock while we were fetching.
+  if (!box.isConnected || box.dataset.sym !== symbol) return;
+
+  if (!items || !items.length) { clearLoading(); return; }
+
+  // Google News titles are "Headline - Publisher" — split out the real source.
+  const live = items.slice(0, 6).map(n => {
+    let headline = n.headline, source = n.source;
+    const m = headline.match(/^(.+?)\s+-\s+([^-]{2,40})$/);
+    if (m) { headline = m[1].trim(); source = m[2].trim(); }
+    return { ...n, headline, source };
+  });
+
+  box.innerHTML = live.map(_rptNewsItemHtml).join('');
+  clearLoading();
 }
 
 // =====================================================================
